@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ t.title }}</title>
+    <style>
+        :root {
+            --bg: #f5f7fb;
+            --panel: rgba(255, 255, 255, 0.95);
+            --text: #0f172a;
+            --muted: #64748b;
+            --accent: #2563eb;
+            --accent-2: #0ea5e9;
+            --accent-3: #10b981;
+            --border: rgba(15, 23, 42, 0.08);
+            --soft: #eef4ff;
+            --shadow: 0 20px 55px rgba(15, 23, 42, 0.12);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            background:
+                radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 30%),
+                radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.14), transparent 25%),
+                linear-gradient(135deg, #f8fbff 0%, #f2f6ff 45%, #f7f9fc 100%);
+        }
+
+        .hero {
+            width: min(100%, 1120px);
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 30px;
+            overflow: hidden;
+            box-shadow: var(--shadow);
+            backdrop-filter: blur(22px);
+        }
+
+        header {
+            padding: 28px 32px;
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(14, 165, 233, 0.1));
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+            border-bottom: 1px solid rgba(37, 99, 235, 0.08);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand img {
+            width: 74px;
+            height: 74px;
+            border-radius: 18px;
+            box-shadow: 0 12px 24px rgba(0, 0, 0, 0.16);
+        }
+
+        .brand h1 {
+            margin: 0 0 5px;
+            font-size: 1.9rem;
+        }
+
+        .brand p {
+            margin: 0;
+            color: var(--muted);
+            font-size: 0.98rem;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .badge {
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.9);
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            font-size: 0.92rem;
+            color: #1d4ed8;
+            font-weight: 700;
+        }
+
+        .lang-switcher {
+            display: flex;
+            gap: 6px;
+            padding: 5px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(37, 99, 235, 0.12);
+        }
+
+        .lang-switcher a {
+            text-decoration: none;
+            color: var(--muted);
+            font-weight: 600;
+            padding: 6px 10px;
+            border-radius: 999px;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .lang-switcher a.active {
+            background: var(--accent);
+            color: white;
+        }
+
+        main {
+            padding: 32px;
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 24px;
+        }
+
+        .section-card {
+            padding: 28px;
+            border-radius: 24px;
+            background: linear-gradient(145deg, #ffffff, #f7fbff);
+            border: 1px solid rgba(37, 99, 235, 0.12);
+            box-shadow: 0 12px 26px rgba(15, 23, 42, 0.05);
+        }
+
+        .section-grid {
+            display: grid;
+            grid-template-columns: 1.08fr 0.92fr;
+            gap: 28px;
+            align-items: center;
+        }
+
+        .hero-copy h2 {
+            font-size: clamp(1.7rem, 3vw, 2.35rem);
+            margin: 0 0 12px;
+            line-height: 1.2;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            margin: 20px 0 18px;
+        }
+
+        .stat {
+            padding: 14px;
+            background: rgba(37, 99, 235, 0.06);
+            border: 1px solid rgba(37, 99, 235, 0.1);
+            border-radius: 14px;
+        }
+
+        .stat strong {
+            display: block;
+            font-size: 1.1rem;
+            color: var(--accent);
+        }
+
+        .stat span {
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .hero-copy p {
+            margin: 0 0 16px;
+            color: var(--muted);
+            font-size: 1rem;
+            line-height: 1.7;
+        }
+
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .chips span {
+            padding: 8px 12px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+            color: #334155;
+        }
+
+        .upload-card {
+            padding: 24px;
+            border-radius: 24px;
+            background: linear-gradient(145deg, #f8fbff, #eef5ff);
+            border: 1px solid rgba(37, 99, 235, 0.16);
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 14px 32px rgba(37, 99, 235, 0.08);
+        }
+
+        .upload-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(37, 99, 235, 0.35);
+            box-shadow: 0 14px 30px rgba(37, 99, 235, 0.08);
+        }
+
+        .upload-card h3 {
+            margin: 0 0 8px;
+            font-size: 1.2rem;
+        }
+
+        .upload-card p {
+            margin: 0 0 16px;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        button {
+            border: none;
+            padding: 13px 18px;
+            border-radius: 999px;
+            font-size: 0.98rem;
+            font-weight: 700;
+            cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: white;
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.16);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        button:hover {
+            filter: brightness(1.08);
+            transform: translateY(-1px);
+        }
+
+        .feature-list {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 16px;
+        }
+
+        .feature-list div {
+            padding: 12px;
+            border-radius: 12px;
+            background: white;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            color: var(--text);
+            font-size: 0.92rem;
+        }
+
+        small {
+            display: block;
+            margin-top: 10px;
+            color: var(--muted);
+            font-size: 0.87rem;
+        }
+
+        .results-panel {
+            padding: 0 32px 32px;
+        }
+
+        .results-panel hr {
+            border: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.25), transparent);
+        }
+
+        .results-panel h3 {
+            margin: 0 0 8px;
+            font-size: 1.25rem;
+        }
+
+        .results-panel .subtitle {
+            margin: 0 0 18px;
+            color: var(--muted);
+        }
+
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            padding: 20px;
+            border-radius: 20px;
+            background: white;
+            border: 1px solid rgba(148, 163, 184, 0.22);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.06);
+        }
+
+        .metric-card .label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 8px;
+        }
+
+        .metric-card .value {
+            display: block;
+            font-size: 2rem;
+            font-weight: 800;
+            color: var(--text);
+        }
+
+        .metric-card.workers {
+            background: linear-gradient(135deg, #eff6ff, #dbeafe);
+        }
+
+        .metric-card.safe {
+            background: linear-gradient(135deg, #f0fdf4, #dcfce7);
+        }
+
+        .metric-card.violations {
+            background: linear-gradient(135deg, #fef2f2, #ffe4e6);
+        }
+
+        .result-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 20px;
+        }
+
+        .result-card {
+            background: white;
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 22px;
+            padding: 16px;
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
+        }
+
+        .result-card img {
+            width: 100%;
+            border-radius: 12px;
+            display: block;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 760px) {
+            body {
+                padding: 14px;
+            }
+
+            main {
+                grid-template-columns: 1fr;
+                padding: 24px;
+            }
+
+            .stats,
+            .feature-list,
+            .dashboard,
+            .result-grid {
+                grid-template-columns: 1fr;
+            }
+
+            header {
+                padding: 24px;
+            }
+
+            .results-panel {
+                padding: 0 24px 24px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="hero">
+        <header>
+            <div class="brand">
+                <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI Logo">
+                <div>
+                    <h1>{{ t.title }}</h1>
+                    <p>{{ t.subtitle }}</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <div class="lang-switcher" aria-label="{{ t.lang_label }}">
+                    <a href="{{ url_for('home', lang='en') }}" class="{% if lang == 'en' %}active{% endif %}">EN</a>
+                    <a href="{{ url_for('home', lang='hi') }}" class="{% if lang == 'hi' %}active{% endif %}">हिं</a>
+                    <a href="{{ url_for('home', lang='kn') }}" class="{% if lang == 'kn' %}active{% endif %}">KN</a>
+                </div>
+                <div class="badge">{{ t.badge }}</div>
+            </div>
+        </header>
+
+        <main>
+            <section class="section-card">
+                <div class="section-grid">
+                    <div class="hero-copy">
+                        <h2>{{ t.heading }}</h2>
+                        <p>{{ t.description }}</p>
+                        <div class="stats">
+                            <div class="stat">
+                                <strong>{{ t.stats_1_value }}</strong>
+                                <span>{{ t.stats_1_label }}</span>
+                            </div>
+                            <div class="stat">
+                                <strong>{{ t.stats_2_value }}</strong>
+                                <span>{{ t.stats_2_label }}</span>
+                            </div>
+                            <div class="stat">
+                                <strong>{{ t.stats_3_value }}</strong>
+                                <span>{{ t.stats_3_label }}</span>
+                            </div>
+                        </div>
+                        <div class="chips">
+                            <span>{{ t.chip_1 }}</span>
+                            <span>{{ t.chip_2 }}</span>
+                            <span>{{ t.chip_3 }}</span>
+                        </div>
+                        <div class="feature-list">
+                            <div>{{ t.feature_1 }}</div>
+                            <div>{{ t.feature_2 }}</div>
+                        </div>
+                    </div>
+
+                    <div class="upload-card">
+                        <h3>{{ t.upload_title }}</h3>
+                        <p>{{ t.upload_desc }}</p>
+                        <form action="/predict?lang={{ lang }}" method="POST" enctype="multipart/form-data" style="margin-top:12px;">
+                            <input type="file" name="file" accept=".jpg,.jpeg,.png,.mp4" required>
+                            <button type="submit">{{ t.button }}</button>
+                        </form>
+                        <small>{{ t.support }}</small>
+                    </div>
+                </div>
+            </section>
+
+        {% if uploaded_image %}
+        <div class="results-panel">
+            <hr style="margin:20px 0;">
+            <h3>Safety Dashboard</h3>
+            <p class="subtitle">Live inspection summary for the uploaded scene.</p>
+
+            <div class="dashboard">
+                <div class="metric-card workers">
+                    <span class="label">Workers</span>
+                    <strong class="value">{{ workers|default(0) }}</strong>
+                </div>
+                <div class="metric-card safe">
+                    <span class="label">Safe Workers</span>
+                    <strong class="value">{{ safe_workers|default(0) }}</strong>
+                </div>
+                <div class="metric-card violations">
+                    <span class="label">Violations</span>
+                    <strong class="value">{{ violations|default(0) }}</strong>
+                </div>
+            </div>
+
+            <div class="result-grid">
+                <div class="result-card">
+                    <h3>Uploaded File</h3>
+                    <img src="/{{ uploaded_image }}" alt="Uploaded file preview">
+                </div>
+                <div class="result-card">
+                    <h3>Detection Result</h3>
+                    <img src="/{{ result_image }}" alt="Detection result preview">
+                    <a href="/{{ result_image }}" download style="display:inline-block; margin-top:12px; text-decoration:none;">
+                        <button type="button" style="padding:10px 16px;">Download Result</button>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</body>
+</html>

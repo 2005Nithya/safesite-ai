@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Analytics</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .chart-wrap { position: relative; height: 300px; }
+    @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="brand">
+        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
+        <div>
+          <div class="brand-title">Analytics Overview</div>
+          <div class="brand-sub">Compliance and inspection trends from your detection history.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
+        <a class="btn secondary" href="{{ url_for('history') }}">History</a>
+        <a class="btn secondary" href="{{ url_for('about') }}">About</a>
+      </div>
+    </div>
+
+    <div class="metric-grid">
+      <div class="metric-card">
+        <span class="label">Inspections</span>
+        <span class="value">{{ metrics.total_inspections }}</span>
+      </div>
+      <div class="metric-card">
+        <span class="label">Workers detected</span>
+        <span class="value">{{ metrics.total_workers }}</span>
+      </div>
+      <div class="metric-card green">
+        <span class="label">Safe workers</span>
+        <span class="value">{{ metrics.total_safe }}</span>
+      </div>
+      <div class="metric-card red">
+        <span class="label">Total violations</span>
+        <span class="value">{{ metrics.total_violations }}</span>
+      </div>
+      <div class="metric-card amber">
+        <span class="label">Avg. compliance</span>
+        <span class="value">{{ metrics.avg_compliance }}%</span>
+      </div>
+      <div class="metric-card green">
+        <span class="label">Safe inspections</span>
+        <span class="value">{{ metrics.safe_count }}</span>
+      </div>
+      <div class="metric-card red">
+        <span class="label">Unsafe inspections</span>
+        <span class="value">{{ metrics.unsafe_count }}</span>
+      </div>
+    </div>
+
+    <div class="chart-grid">
+      <div class="card">
+        <h3>Inspections per day</h3>
+        <div class="chart-wrap">
+          <canvas id="inspectionsChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Compliance trend (%)</h3>
+        <div class="chart-wrap">
+          <canvas id="complianceChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Site status breakdown</h3>
+        <div class="chart-wrap">
+          <canvas id="statusChart"></canvas>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Files with the most violations</h3>
+        <div class="chart-wrap">
+          <canvas id="filesChart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+  </div>
+
+  {% if metrics.total_inspections %}
+  <script>
+    const days = {{ trend_data | map(attribute='day') | list | tojson }};
+    const counts = {{ trend_data | map(attribute='count') | list | tojson }};
+    const compliance = {{ trend_data | map(attribute='compliance') | list | tojson }};
+    const files = {{ top_files | map(attribute='file') | list | tojson }};
+    const violations = {{ top_files | map(attribute='violations') | list | tojson }};
+    const safeCount = {{ metrics.safe_count }};
+    const unsafeCount = {{ metrics.unsafe_count }};
+
+    Chart.defaults.font.family = 'Inter, Segoe UI, sans-serif';
+
+    new Chart(document.getElementById('inspectionsChart'), {
+      type: 'bar',
+      data: {
+        labels: days,
+        datasets: [{
+          label: 'Inspections',
+          data: counts,
+          backgroundColor: 'rgba(37,99,235,0.75)',
+          borderColor: '#2563eb',
+          borderWidth: 1,
+          borderRadius: 8
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+    });
+
+    new Chart(document.getElementById('complianceChart'), {
+      type: 'line',
+      data: {
+        labels: days,
+        datasets: [{
+          label: 'Compliance %',
+          data: compliance,
+          borderColor: '#16a34a',
+          backgroundColor: 'rgba(22,163,74,0.15)',
+          fill: true,
+          tension: 0.35,
+          pointBackgroundColor: '#16a34a'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+      }
+    });
+
+    new Chart(document.getElementById('statusChart'), {
+      type: 'doughnut',
+      data: {
+        labels: ['Safe', 'Unsafe'],
+        datasets: [{
+          data: [safeCount, unsafeCount],
+          backgroundColor: ['#16a34a', '#dc2626'],
+          borderWidth: 2
+        }]
+      },
+      options: { responsive: true, maintainAspectRatio: false }
+    });
+
+    new Chart(document.getElementById('filesChart'), {
+      type: 'bar',
+      data: {
+        labels: files,
+        datasets: [{
+          label: 'Violations',
+          data: violations,
+          backgroundColor: 'rgba(220,38,38,0.75)',
+          borderColor: '#dc2626',
+          borderWidth: 1,
+          borderRadius: 8
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } }
+      }
+    });
+  </script>
+  {% else %}
+  <script>
+    for (const id of ['inspectionsChart', 'complianceChart', 'statusChart', 'filesChart']) {
+      document.getElementById(id).outerHTML = '<p class="empty">No detection data yet. Run a detection to start building analytics.</p>';
+    }
+  </script>
+  {% endif %}
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>

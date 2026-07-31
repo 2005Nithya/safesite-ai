@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | About</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .developer { display: flex; gap: 18px; align-items: center; }
+    .dev-avatar { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 1.5rem; color: #fff; background: var(--grad); flex-shrink: 0; box-shadow: 0 10px 22px rgba(37,99,235,0.25); }
+    .dev-name { margin: 0 0 6px; font-size: 1.25rem; font-weight: 800; }
+    .dev-detail { margin: 3px 0; color: var(--muted); }
+    .dev-detail a { color: #1d4ed8; text-decoration: none; font-weight: 600; }
+    .dev-detail a:hover { text-decoration: underline; }
+    .feature { padding: 22px; border-radius: var(--radius-md); background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    .feature .icon { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-size: 1.3rem; background: #eaf2ff; margin-bottom: 12px; }
+    .feature p { color: var(--muted); font-size: 0.93rem; }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div class="brand">
+        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
+        <div>
+          <div class="brand-title">About SafeSite AI</div>
+          <div class="brand-sub">AI-powered PPE compliance monitoring for construction sites.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
+        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="split-grid" style="align-items:center;">
+        <div>
+          <span class="pill">Mission</span>
+          <h2 style="font-size:1.6rem; margin-top:12px;">Keeping every worker safe on every shift.</h2>
+          <p style="color:var(--muted);">SafeSite AI uses a computer vision model trained on construction site imagery to detect workers and assess whether they are wearing the required protective gear — hard hats, vests, and other PPE. Upload a photo, a video, or stream from a live camera, and SafeSite AI flags non-compliant workers instantly.</p>
+        </div>
+        <div class="card" style="box-shadow:none; background:var(--panel-2);">
+          <h3>How it works</h3>
+          <ul class="clean-list">
+            <li><strong>Upload or stream</strong> images, video files, or live camera feeds.</li>
+            <li><strong>AI detection</strong> identifies workers and PPE violations per frame.</li>
+            <li><strong>Instant summary</strong> shows workers, safe workers, and violations.</li>
+            <li><strong>Reports & analytics</strong> track compliance over time and export inspection PDFs.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="tri-grid">
+      <div class="feature">
+        <div class="icon">🛡️</div>
+        <h3>Image detection</h3>
+        <p>Run PPE compliance checks on single photos from any site or device, with a downloadable annotated result.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🎥</div>
+        <h3>Video detection</h3>
+        <p>Analyse uploaded recordings frame by frame and get a full-site summary of detected workers and violations.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">📡</div>
+        <h3>Live monitoring</h3>
+        <p>Connect a webcam or demo feed for real-time on-site monitoring with continuous PPE status updates.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Technologies</h3>
+      <p style="color:var(--muted);">SafeSite AI is built on a Flask web server, a custom YOLOv8 computer vision model, OpenCV for video processing, and ReportLab for generating PDF inspection reports.</p>
+    </div>
+
+    <div class="card">
+      <h3>Developed by</h3>
+      <div class="developer">
+        <div class="dev-avatar">NJ</div>
+        <div>
+          <p class="dev-name">Nithyashree P Jain</p>
+          <p class="dev-detail">Phone: <a href="tel:+919356502389">+91 93565 02389</a></p>
+          <p class="dev-detail">Email: <a href="mailto:nithyasheejain@gmail.com">nithyasheejain@gmail.com</a></p>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+  </div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>

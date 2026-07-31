@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Access your workspace</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    body { display: flex; align-items: center; justify-content: center; }
+    .auth-card { width: min(460px, 100%); background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 32px; box-shadow: var(--shadow); }
+    .brand { margin-bottom: 22px; }
+    .mini-list { list-style: none; margin: 18px 0 0; padding: 0; color: var(--muted); font-size: 0.9rem; display: grid; gap: 8px; }
+    .mini-list li::before { content: "✓ "; color: var(--success); font-weight: 800; }
+    .hint { font-size: 0.9rem; color: var(--muted); margin-top: 14px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <div class="auth-card">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
+      <div>
+        <div class="brand-title">SafeSite AI</div>
+        <div class="brand-sub">Secure site access</div>
+      </div>
+    </div>
+
+    <h2 style="margin-bottom:6px;">Welcome back</h2>
+    <p style="color:var(--muted); margin-bottom:22px;">Sign in or create an account to access your dashboard and begin PPE monitoring.</p>
+
+    {% if error %}<div class="error-box">{{ error }}</div>{% endif %}
+
+    <form method="post" class="form-grid">
+      <input class="input" type="email" name="email" id="email" placeholder="Email address" required />
+      <input class="input" type="password" name="password" id="password" placeholder="Password" required />
+      <input type="hidden" name="mode" id="mode" value="signin" />
+      <div class="actions" style="display:flex; gap:10px; flex-wrap:wrap; margin-top:4px;">
+        <button type="submit" id="signinBtn" class="btn">Sign In</button>
+        <button type="submit" id="signupBtn" class="btn secondary">Create account</button>
+      </div>
+    </form>
+
+    <p class="hint" id="status">Your account creation and sign-in are processed securely through Firebase-backed authentication.</p>
+    <p class="hint" id="firebaseStatus">Checking Firebase configuration…</p>
+
+    <ul class="mini-list">
+      <li>Use your team email address</li>
+      <li>Choose a strong password</li>
+      <li>Access the dashboard and detection tools after login</li>
+    </ul>
+
+    <p style="margin-top:18px; text-align:center;">
+      <a class="btn ghost sm" href="{{ url_for('home') }}">← Back to home</a>
+    </p>
+  </div>
+
+  <script>
+    const signinBtn = document.getElementById('signinBtn');
+    const signupBtn = document.getElementById('signupBtn');
+    const modeInput = document.getElementById('mode');
+    const firebaseStatus = document.getElementById('firebaseStatus');
+    signinBtn.addEventListener('click', function () { modeInput.value = 'signin'; });
+    signupBtn.addEventListener('click', function () { modeInput.value = 'signup'; });
+
+    fetch('/health/firebase')
+      .then((response) => response.json())
+      .then((data) => {
+        firebaseStatus.textContent = data.configured
+          ? 'Firebase is configured for this app and ready for account creation.'
+          : 'Firebase is not fully configured yet. Please confirm your project values.';
+      })
+      .catch(() => {
+        firebaseStatus.textContent = 'Unable to verify Firebase configuration right now.';
+      });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>

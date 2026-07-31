@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#f8fbff" />
+  <title>SafeSite AI | Welcome</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .landing { max-width: 1120px; margin: 0 auto; display: grid; gap: 20px; }
+    .hero-shell { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; box-shadow: var(--shadow); }
+    .nav { padding: 20px 30px; display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; border-bottom: 1px solid var(--border); background: rgba(255,255,255,0.7); }
+    .hero-inner { padding: 44px 34px; display: grid; gap: 28px; grid-template-columns: 1.05fr 0.95fr; align-items: center; }
+    .hero-inner h2 { font-size: clamp(1.9rem, 4vw, 2.7rem); margin: 12px 0; letter-spacing: -0.03em; }
+    .hero-inner .lead { color: var(--muted); font-size: 1.02rem; line-height: 1.7; }
+    .stat-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 22px; }
+    .stat-box { padding: 16px; background: var(--panel-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+    .stat-box strong { display: block; font-size: 1.15rem; color: var(--accent); }
+    .stat-box span { font-size: 0.85rem; color: var(--muted); }
+    .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .feature { padding: 22px; border-radius: var(--radius-md); background: var(--panel); border: 1px solid var(--border); box-shadow: var(--shadow-sm); }
+    .feature .icon { width: 44px; height: 44px; border-radius: 13px; display: grid; place-items: center; font-size: 1.3rem; background: #eaf2ff; margin-bottom: 12px; }
+    .feature p { color: var(--muted); font-size: 0.92rem; }
+    @media (max-width: 900px) { .hero-inner { grid-template-columns: 1fr; } .feature-grid { grid-template-columns: 1fr; } }
+    @media (max-width: 640px) { .stat-row { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="landing">
+    <div class="hero-shell">
+      <div class="nav">
+        <div class="brand">
+          <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
+          <div>
+            <div class="brand-title">SafeSite AI</div>
+            <div class="brand-sub">Professional construction safety monitoring</div>
+          </div>
+        </div>
+        <div class="actions">
+          <a class="btn secondary" href="{{ url_for('about') }}">About</a>
+          <a class="btn" href="{{ url_for('auth') }}">Start your journey</a>
+        </div>
+      </div>
+
+      <section class="hero-inner">
+        <div>
+          <span class="pill">A brighter, more modern safety workflow</span>
+          <h2>Protect every crew with smart PPE detection.</h2>
+          <p class="lead">SafeSite AI combines a polished onboarding experience, real Firebase authentication, and a powerful dashboard for site leads who want clarity at every step.</p>
+          <div class="actions">
+            <a class="btn" href="{{ url_for('auth') }}">Sign in / Create account</a>
+          </div>
+          <div class="stat-row">
+            <div class="stat-box"><strong>24/7</strong><span>Always-on review</span></div>
+            <div class="stat-box"><strong>98%</strong><span>Detection focus</span></div>
+            <div class="stat-box"><strong>Fast</strong><span>Instant insights</span></div>
+          </div>
+        </div>
+        <div class="card">
+          <h3>What you can do</h3>
+          <ul class="clean-list">
+            <li>Sign in or create an account with Firebase</li>
+            <li>Review a modern dashboard for site activity</li>
+            <li>Upload images and inspect PPE violations instantly</li>
+            <li>Use the app as a progressive web app on mobile or desktop</li>
+          </ul>
+        </div>
+      </section>
+    </div>
+
+    <div class="feature-grid">
+      <div class="feature">
+        <div class="icon">🛡️</div>
+        <h3>Image detection</h3>
+        <p>Upload photos from any site or device and get instant annotated PPE compliance results.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🎥</div>
+        <h3>Video & live feeds</h3>
+        <p>Analyse recordings frame by frame or stream a webcam for real-time site monitoring.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">📊</div>
+        <h3>Reports & analytics</h3>
+        <p>Track compliance trends, export CSV history, and generate PDF inspection reports.</p>
+      </div>
+    </div>
+
+    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+  </div>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>

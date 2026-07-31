@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Live Monitoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app-shell narrow">
+    <div class="topbar">
+      <div class="brand">
+        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
+        <div>
+          <div class="brand-title">Live Monitoring</div>
+          <div class="brand-sub">Hi {{ user_name }}, run real-time PPE detection on a live feed.</div>
+        </div>
+      </div>
+      <div class="actions">
+        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
+        <a class="btn secondary" href="{{ url_for('history') }}">History</a>
+        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input id="cameraIndex" class="input" type="number" min="0" step="1" value="0" style="width:100px;" aria-label="Camera index" />
+        <button id="startWebcam" class="btn" type="button">Start Webcam</button>
+        <button id="showDemo" class="btn secondary" type="button">Use Demo Video</button>
+        <button id="stopStream" class="btn danger" type="button">Stop Stream</button>
+      </div>
+
+      <div class="viewer" style="width:100%; min-height:400px; border-radius:var(--radius-md); border:1px solid var(--border); background:#0f172a; overflow:hidden; display:flex; align-items:center; justify-content:center; margin-top:18px;">
+        <img
+          id="streamViewer"
+          alt="Live monitoring stream"
+          data-demo-src="{{ url_for('video_feed') }}"
+          data-webcam-base="{{ url_for('webcam_feed') }}"
+          src="{{ url_for('video_feed') }}"
+          style="width:100%; display:block;"
+        />
+      </div>
+
+      <p id="streamStatus" class="chip info" style="margin-top:14px;">Showing demo video. Click "Start Webcam" to switch to your camera.</p>
+      <p class="note" style="color:var(--muted);">If your webcam does not open, try another camera index like <strong>1</strong>. The stream uses the camera connected to the machine running Flask.</p>
+    </div>
+
+    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+  </div>
+
+  <script>
+    const viewer = document.getElementById("streamViewer");
+    const cameraIndexInput = document.getElementById("cameraIndex");
+    const statusText = document.getElementById("streamStatus");
+
+    function stopStream() {
+      viewer.removeAttribute("src");
+      statusText.textContent = "Stream stopped.";
+      statusText.className = "chip";
+    }
+
+    document.getElementById("startWebcam").addEventListener("click", () => {
+      const cameraIndex = Number.parseInt(cameraIndexInput.value || "0", 10);
+      const webcamBase = viewer.dataset.webcamBase;
+      viewer.src = `${webcamBase}?camera=${Number.isNaN(cameraIndex) ? 0 : cameraIndex}&t=${Date.now()}`;
+      statusText.textContent = `Showing webcam ${Number.isNaN(cameraIndex) ? 0 : cameraIndex} with live PPE detection.`;
+      statusText.className = "chip info";
+    });
+
+    document.getElementById("showDemo").addEventListener("click", () => {
+      viewer.src = `${viewer.dataset.demoSrc}?t=${Date.now()}`;
+      statusText.textContent = "Showing demo video feed.";
+      statusText.className = "chip info";
+    });
+
+    document.getElementById("stopStream").addEventListener("click", stopStream);
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>

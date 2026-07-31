@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Detection History</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app-shell">
+    <div class="topbar">
+      <div>
+        <h1>Detection History</h1>
+        <p class="subtitle">Every inspection run on your site, logged with full compliance detail.</p>
+      </div>
+      <div class="actions">
+        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Back to dashboard</a>
+        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
+        <a class="btn" href="{{ url_for('export_history') }}">Export CSV</a>
+      </div>
+    </div>
+
+    <div class="metric-grid cols-3">
+      <div class="metric-card">
+        <span class="label">Total inspections</span>
+        <span class="value">{{ summary.total }}</span>
+      </div>
+      <div class="metric-card green">
+        <span class="label">Safe inspections</span>
+        <span class="value">{{ summary.safe }}</span>
+        <span class="hint">{{ summary.safe_workers }} workers compliant</span>
+      </div>
+      <div class="metric-card red">
+        <span class="label">Unsafe inspections</span>
+        <span class="value">{{ summary.unsafe }}</span>
+        <span class="hint">{{ summary.violations }} violations logged</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:16px;">
+        <h3 style="margin:0;">Inspection log</h3>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <input id="search" class="input" type="text" placeholder="Search file or date…" style="max-width:260px;" />
+          <form action="{{ url_for('clear_history') }}" method="post" onsubmit="return confirm('Clear all detection history? This cannot be undone.');">
+            <button type="submit" class="btn danger sm">Clear history</button>
+          </form>
+        </div>
+      </div>
+
+      {% if records %}
+      <div class="table-wrap">
+        <table class="table" id="historyTable">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>File</th>
+              <th>Workers</th>
+              <th>Safe Workers</th>
+              <th>Violations</th>
+              <th>Compliance</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr>
+              <td>{{ r.date }}</td>
+              <td>{{ r.file }}</td>
+              <td>{{ r.workers }}</td>
+              <td>{{ r.safe_workers }}</td>
+              <td>{{ r.violations }}</td>
+              <td>{{ r.compliance }}%</td>
+              <td>
+                {% if r.status == "SAFE" %}
+                <span class="chip good">● Safe</span>
+                {% else %}
+                <span class="chip bad">● Unsafe</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="empty">No detection history yet. Run a detection from the workspace to see records here.</p>
+      {% endif %}
+    </div>
+
+    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+  </div>
+
+  <script>
+    const search = document.getElementById('search');
+    const rows = document.querySelectorAll('#historyTable tbody tr');
+    search.addEventListener('input', function () {
+      const q = search.value.toLowerCase();
+      rows.forEach(function (row) {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+      });
+    });
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>

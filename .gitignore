@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+
+# Uploads, results and media (regenerated at runtime)
+static/uploads/
+static/results/
+images/
+dataset/
+*.mp4
+*.avi
+*.mov
+*.mkv
+*.webm
+!construction.mp4
+
+# Reports
+*.pdf
+
+# Runtime data
+history.json
+
+# OS / editor
+.DS_Store
+Thumbs.db
+*.log
