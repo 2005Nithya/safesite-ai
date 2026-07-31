@@ -14,6 +14,8 @@ from video_detection import generate_camera_frames, generate_frames
 from flask import Response
 import cv2
 from detection import process_frame
+import base64
+import numpy as np
 
 try:
     from detection import process_image, process_video, summarize_video
@@ -352,6 +354,33 @@ def webcam_feed():
         generate_camera_frames(camera_index),
         mimetype="multipart/x-mixed-replace; boundary=frame"
     )
+
+
+@app.route("/webcam_predict", methods=["POST"])
+def webcam_predict():
+    data = request.get_data()
+    if not data:
+        return jsonify({"error": "No frame received"}), 400
+
+    try:
+        frame = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
+        if frame is None:
+            return jsonify({"error": "Invalid image"}), 400
+    except Exception:
+        return jsonify({"error": "Invalid image"}), 400
+
+    processed, workers, safe, violations = process_frame(frame)
+
+    ok, encoded = cv2.imencode(".jpg", processed)
+    if not ok:
+        return jsonify({"error": "Encoding failed"}), 500
+
+    return jsonify({
+        "image": base64.b64encode(encoded.tobytes()).decode("ascii"),
+        "workers": workers,
+        "safe": safe,
+        "violations": violations,
+    })
 
 
 @app.route("/download_report")

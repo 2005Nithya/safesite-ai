@@ -4,10 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SafeSite AI | Live Monitoring</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="manifest" href="{{ url_for('manifest') }}" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
@@ -17,7 +17,7 @@
         <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
         <div>
           <div class="brand-title">Live Monitoring</div>
-          <div class="brand-sub">Hi {{ user_name }}, run real-time PPE detection on a live feed.</div>
+          <div class="brand-sub">Hi {{ user_name }}, run real-time PPE detection on your camera or a demo feed.</div>
         </div>
       </div>
       <div class="actions">
@@ -29,8 +29,7 @@
 
     <div class="card">
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-        <input id="cameraIndex" class="input" type="number" min="0" step="1" value="0" style="width:100px;" aria-label="Camera index" />
-        <button id="startWebcam" class="btn" type="button">Start Webcam</button>
+        <button id="startWebcam" class="btn" type="button">📷 Start Webcam</button>
         <button id="showDemo" class="btn secondary" type="button">Use Demo Video</button>
         <button id="stopStream" class="btn danger" type="button">Stop Stream</button>
       </div>
@@ -40,40 +39,104 @@
           id="streamViewer"
           alt="Live monitoring stream"
           data-demo-src="{{ url_for('video_feed') }}"
-          data-webcam-base="{{ url_for('webcam_feed') }}"
           src="{{ url_for('video_feed') }}"
           style="width:100%; display:block;"
         />
+        <video id="webcamVideo" autoplay playsinline muted style="width:100%; display:none;"></video>
+        <canvas id="frameCanvas" width="640" height="360" style="display:none;"></canvas>
+        <img id="webcamResult" alt="Webcam detection result" style="width:100%; display:none; border-radius:0;" />
       </div>
 
-      <p id="streamStatus" class="chip info" style="margin-top:14px;">Showing demo video. Click "Start Webcam" to switch to your camera.</p>
-      <p class="note" style="color:var(--muted);">If your webcam does not open, try another camera index like <strong>1</strong>. The stream uses the camera connected to the machine running Flask.</p>
+      <p id="streamStatus" class="chip info" style="margin-top:14px;">Showing demo video. Click "Start Webcam" to use your device camera.</p>
+      <p class="note" style="color:var(--muted);">Webcam detection runs in your browser — your camera captures frames, the AI analyzes them, and the annotated result appears here. Works on any device from the deployed link (needs camera permission).</p>
     </div>
 
     <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
   </div>
 
   <script>
-    const viewer = document.getElementById("streamViewer");
-    const cameraIndexInput = document.getElementById("cameraIndex");
+    const demoViewer = document.getElementById("streamViewer");
+    const videoEl = document.getElementById("webcamVideo");
+    const canvas = document.getElementById("frameCanvas");
+    const ctx = canvas.getContext("2d");
+    const resultImg = document.getElementById("webcamResult");
     const statusText = document.getElementById("streamStatus");
 
-    function stopStream() {
-      viewer.removeAttribute("src");
+    let camStream = null;
+    let predictTimer = null;
+    let inFlight = false;
+
+    function show(elm) {
+      elm.style.display = 'block';
+    }
+    function hide(elm) {
+      elm.style.display = 'none';
+    }
+
+    async function stopStream() {
+      if (predictTimer) { clearInterval(predictTimer); predictTimer = null; }
+      if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+      hide(videoEl);
+      hide(resultImg);
+      hide(canvas);
+      show(demoViewer);
+      demoViewer.src = `${demoViewer.dataset.demoSrc}?t=${Date.now()}`;
       statusText.textContent = "Stream stopped.";
       statusText.className = "chip";
     }
 
-    document.getElementById("startWebcam").addEventListener("click", () => {
-      const cameraIndex = Number.parseInt(cameraIndexInput.value || "0", 10);
-      const webcamBase = viewer.dataset.webcamBase;
-      viewer.src = `${webcamBase}?camera=${Number.isNaN(cameraIndex) ? 0 : cameraIndex}&t=${Date.now()}`;
-      statusText.textContent = `Showing webcam ${Number.isNaN(cameraIndex) ? 0 : cameraIndex} with live PPE detection.`;
-      statusText.className = "chip info";
+    async function sendFrame() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
+        const response = await fetch('/webcam_predict', { method: 'POST', body: blob });
+        const data = await response.json();
+        if (data.error) throw new Error(data.error);
+        resultImg.src = 'data:image/jpeg;base64,' + data.image;
+        statusText.innerHTML =
+          `Workers: <strong>${data.workers}</strong> · Safe: <strong>${data.safe}</strong> · ` +
+          `Violations: <strong>${data.violations}</strong>` +
+          (data.violations > 0 ? ' · <span style="color:#ef4444">⚠ VIOLATIONS DETECTED</span>' : '');
+        statusText.className = data.violations > 0 ? "chip bad" : "chip good";
+      } catch (err) {
+        statusText.textContent = "Detection error: " + err.message;
+        statusText.className = "chip warn";
+      } finally {
+        inFlight = false;
+      }
+    }
+
+    document.getElementById("startWebcam").addEventListener("click", async () => {
+      try {
+        if (!camStream) {
+          camStream = await navigator.mediaDevices.getUserMedia({
+            video: { width: { ideal: 640 }, height: { ideal: 360 } },
+            audio: false
+          });
+          videoEl.srcObject = camStream;
+          await videoEl.play();
+        }
+        hide(demoViewer);
+        hide(resultImg);
+        show(videoEl);
+        predictTimer = setInterval(sendFrame, 250);
+        statusText.textContent = "Webcam running — AI detection active.";
+        statusText.className = "chip info";
+      } catch (err) {
+        statusText.textContent = "Could not start webcam: " + (err.message || err.name) + ". Allow camera permission and try again.";
+        statusText.className = "chip warn";
+      }
     });
 
     document.getElementById("showDemo").addEventListener("click", () => {
-      viewer.src = `${viewer.dataset.demoSrc}?t=${Date.now()}`;
+      if (predictTimer) { clearInterval(predictTimer); predictTimer = null; }
+      if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
+      hide(videoEl);
+      hide(resultImg);
+      show(demoViewer);
+      demoViewer.src = `${demoViewer.dataset.demoSrc}?t=${Date.now()}`;
       statusText.textContent = "Showing demo video feed.";
       statusText.className = "chip info";
     });
