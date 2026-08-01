@@ -1,2 +1,9 @@
 [phases.setup]
-nixPkgs = ["glib","libGL"]
+nixPkgs = [
+"glib",
+"libGL",
+"xorg.libxcb",
+"xorg.libXII",
+"xorg.libXext"
+]
+
