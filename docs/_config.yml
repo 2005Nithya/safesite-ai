@@ -1,0 +1,32 @@
+theme: jekyll-theme-minimal
+title: SafeSite AI
+description: Intelligent Construction Site Safety Detection System
+logo: null
+show_downloads: true
+google_analytics: null
+
+# GitHub Pages settings
+repository: 2005Nithya/safesite-ai
+remote_theme: pages-themes/minimal@v0.2.0
+
+# Markdown settings
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
+
+# Plugin settings
+plugins:
+  - jekyll-github-metadata
+  - jekyll-seo-tag
+  - jekyll-sitemap
+
+# SEO settings
+author: Nithya
+social:
+  name: Nithya
+  links:
+    - https://github.com/2005Nithya
+
+# Permalink structure
+permalink: /:title/
