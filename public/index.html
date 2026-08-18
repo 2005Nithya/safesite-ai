@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SafeSite AI | Netlify</title>
+    <style>
+      :root { color-scheme: dark; }
+      body {
+        margin: 0;
+        font-family: Inter, Arial, sans-serif;
+        background: linear-gradient(135deg, #0f172a, #111827);
+        color: #f8fafc;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+      }
+      .card {
+        width: min(940px, 92vw);
+        background: rgba(15, 23, 42, 0.95);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        border-radius: 20px;
+        padding: 24px;
+        box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+      }
+      .topbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+      .btn { background: #2563eb; color: white; padding: 10px 16px; border: none; border-radius: 999px; cursor: pointer; font-weight: 600; }
+      .btn.secondary { background: #334155; }
+      .viewer { margin-top: 16px; border-radius: 16px; overflow: hidden; background: #020617; display: flex; justify-content: center; align-items: center; border: 1px solid #334155; }
+      canvas, video { width: 100%; max-width: 100%; display: block; }
+      .status { margin-top: 14px; padding: 10px 12px; border-radius: 10px; font-size: 0.95rem; }
+      .status.info { background: #1e3a8a; }
+      .status.good { background: #166534; }
+      .status.warn { background: #92400e; }
+      .summary { margin-top: 10px; color: #cbd5e1; }
+      .note { color: #94a3b8; font-size: 0.95rem; margin-top: 12px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <div class="topbar">
+        <div>
+          <h1 style="margin: 0;">SafeSite AI</h1>
+          <p style="margin: 6px 0 0; color: #cbd5e1;">Netlify-ready webcam demo using TensorFlow.js.</p>
+        </div>
+        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+          <button id="startBtn" class="btn">Start Webcam</button>
+          <button id="stopBtn" class="btn secondary">Stop</button>
+        </div>
+      </div>
+
+      <div class="viewer">
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+      </div>
+
+      <div id="status" class="status info">Loading browser-based detector…</div>
+      <div id="summary" class="summary">Waiting for webcam…</div>
+      <p class="note">This Netlify version uses a browser-side detector so the webcam can run without a Python backend.</p>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@latest/dist/coco-ssd.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

@@ -4,128 +4,125 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>SafeSite AI | Dashboard</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="manifest" href="{{ url_for('manifest') }}" />
   <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-  <div class="app-shell">
-    <div class="topbar">
-      <div class="brand">
-        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
-        <div>
-          <div class="brand-title">SafeSite AI</div>
-          <div class="brand-sub">Operations dashboard</div>
-        </div>
-      </div>
-      <div class="actions">
-        <a class="btn secondary" href="{{ url_for('detection') }}">Detection</a>
-        <a class="btn secondary" href="{{ url_for('live') }}">Live Monitoring</a>
-        <a class="btn secondary" href="{{ url_for('history') }}">History</a>
-        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
-        <a class="btn secondary" href="{{ url_for('about') }}">About</a>
-        <a class="btn ghost" href="{{ url_for('logout') }}">Logout</a>
-      </div>
-    </div>
-
-    <div class="card">
-      <div class="split-grid" style="align-items:center;">
-        <div>
-          <div class="pill">Live site operations overview</div>
-          <h2 style="font-size:1.6rem; margin-top:10px;">Welcome back, {{ user_name }}.</h2>
-          <p style="color:var(--muted);">Your safety workspace is ready. Review compliance, validate fresh uploads, and keep your team aligned on high-risk behavior.</p>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
-            <span class="chip good">● Stable compliance</span>
-            {% if metrics.hazards > 0 %}
-            <span class="chip warn">● Follow-up needed on {{ metrics.hazards }} inspections</span>
-            {% else %}
-            <span class="chip good">● No open hazards</span>
-            {% endif %}
+  <div class="app">
+    {% set active_page = 'dashboard' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell">
+        <div class="topbar">
+          <div>
+            <h1>Operations Dashboard</h1>
+            <p class="subtitle">Welcome back, {{ user_name }}. Your safety workspace is ready.</p>
+          </div>
+          <div class="actions">
+            <a class="btn" href="{{ url_for('detection') }}">Go to detection</a>
           </div>
         </div>
-        <div class="card" style="box-shadow:none; background:var(--panel-2);">
-          <h3>Executive summary</h3>
-          <p style="color:var(--muted); font-size:0.95rem;">Live numbers pulled from your detection history — no manual entry required. Track compliance, hazards, and inspection volume in one place.</p>
-          <div class="progress {% if metrics.compliance >= 70 %}green{% elif metrics.compliance >= 40 %}amber{% else %}red{% endif %}"><div style="width:{{ metrics.compliance }}%"></div></div>
+
+        <div class="card">
+          <div class="split-grid" style="align-items:center;">
+            <div>
+              <span class="pill">Live site operations overview</span>
+              <h2 style="font-size:1.6rem; margin-top:10px;">Site performance is trending in the right direction.</h2>
+              <p style="color:var(--muted);">Live numbers pulled from your detection history — no manual entry required. Track compliance, hazards, and inspection volume in one place.</p>
+              <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+                <span class="chip good">● Stable compliance</span>
+                {% if metrics.hazards > 0 %}
+                <span class="chip warn">● Follow-up needed on {{ metrics.hazards }} inspections</span>
+                {% else %}
+                <span class="chip good">● No open hazards</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="card" style="box-shadow:none; background:var(--panel-2);">
+              <h3>Executive summary</h3>
+              <p style="color:var(--muted); font-size:0.95rem;">{{ metrics.inspections }} inspections logged with {{ metrics.workers }} workers detected and {{ metrics.violations }} violations flagged.</p>
+              <div class="progress {% if metrics.compliance >= 70 %}green{% elif metrics.compliance >= 40 %}amber{% else %}red{% endif %}"><div style="width:{{ metrics.compliance }}%"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span class="label">Compliance rate</span>
+            <span class="value" data-count="{{ metrics.compliance }}" data-suffix="%">0</span>
+            <span class="hint">Average across all inspections</span>
+            <div class="progress {% if metrics.compliance >= 70 %}green{% elif metrics.compliance >= 40 %}amber{% else %}red{% endif %}"><div style="width:{{ metrics.compliance }}%"></div></div>
+          </div>
+          <div class="metric-card red">
+            <span class="label">Open hazards</span>
+            <span class="value" data-count="{{ metrics.hazards }}">0</span>
+            <span class="hint">{{ metrics.violations }} violations logged</span>
+          </div>
+          <div class="metric-card">
+            <span class="label">Inspections logged</span>
+            <span class="value" data-count="{{ metrics.inspections }}">0</span>
+          </div>
+          <div class="metric-card green">
+            <span class="label">Workers detected</span>
+            <span class="value" data-count="{{ metrics.workers }}">0</span>
+            <span class="hint">{{ metrics.safe_workers }} safe workers</span>
+          </div>
+        </div>
+
+        <div class="tri-grid">
+          <div class="card">
+            <h3>Upload Review</h3>
+            <p style="color:var(--muted);">Run image or video detection from the main workspace and inspect the output quickly.</p>
+            <a class="btn sm" href="{{ url_for('detection') }}">Open detection workspace</a>
+          </div>
+          <div class="card">
+            <h3>Webcam Monitor</h3>
+            <p style="color:var(--muted);">Start live monitoring with your device camera — works from any browser.</p>
+            <a class="btn sm" href="{{ url_for('live') }}">Open live monitoring</a>
+          </div>
+          <div class="card">
+            <h3>History & Analytics</h3>
+            <p style="color:var(--muted);">Review recent detections and explore compliance trends with interactive charts.</p>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn sm" href="{{ url_for('history') }}">History</a>
+              <a class="btn sm" href="{{ url_for('analytics') }}">Analytics</a>
+            </div>
+          </div>
+        </div>
+
+        <div class="split-grid">
+          <div class="card">
+            <h3>Recent activity</h3>
+            <ul class="clean-list">
+              {% for item in recent_activity %}
+              <li>
+                <strong>{{ item.title }}</strong>
+                <div style="color:var(--muted); font-size:0.9rem; margin-top:2px;">{{ item.detail }}</div>
+              </li>
+              {% endfor %}
+            </ul>
+          </div>
+          <div class="card">
+            <h3>Site highlights</h3>
+            <ul class="clean-list">
+              <li>Daily compliance snapshot from live data</li>
+              <li>AI detection workspace for images & video</li>
+              <li>Progressive web app experience</li>
+            </ul>
+            <div class="timeline" style="margin-top:16px;">
+              <div class="step"><div class="dot"></div><div class="text">Fresh inspection data reflected in dashboard metrics.</div></div>
+              <div class="step"><div class="dot"></div><div class="text">Violations routed into the analytics trend charts.</div></div>
+              <div class="step"><div class="dot"></div><div class="text">Export inspection history to CSV anytime.</div></div>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
-
-    <div class="metric-grid">
-      <div class="metric-card">
-        <span class="label">Compliance rate</span>
-        <span class="value">{{ metrics.compliance }}%</span>
-        <span class="hint">Average across all inspections</span>
-        <div class="progress {% if metrics.compliance >= 70 %}green{% elif metrics.compliance >= 40 %}amber{% else %}red{% endif %}"><div style="width:{{ metrics.compliance }}%"></div></div>
-      </div>
-      <div class="metric-card red">
-        <span class="label">Open hazards</span>
-        <span class="value">{{ metrics.hazards }}</span>
-        <span class="hint">{{ metrics.violations }} violations logged</span>
-      </div>
-      <div class="metric-card">
-        <span class="label">Inspections logged</span>
-        <span class="value">{{ metrics.inspections }}</span>
-      </div>
-      <div class="metric-card green">
-        <span class="label">Workers detected</span>
-        <span class="value">{{ metrics.workers }}</span>
-        <span class="hint">{{ metrics.safe_workers }} safe workers</span>
-      </div>
-    </div>
-
-    <div class="tri-grid">
-      <div class="card">
-        <h3>Upload Review</h3>
-        <p style="color:var(--muted);">Run image or video detection from the main workspace and inspect the output quickly.</p>
-        <a class="btn sm" href="{{ url_for('detection') }}">Open detection workspace</a>
-      </div>
-      <div class="card">
-        <h3>Webcam Monitor</h3>
-        <p style="color:var(--muted);">Start live monitoring and switch to webcam-based PPE detection when needed.</p>
-        <a class="btn sm" href="{{ url_for('live') }}">Open live monitoring</a>
-      </div>
-      <div class="card">
-        <h3>History & Analytics</h3>
-        <p style="color:var(--muted);">Review recent detections and explore compliance trends with interactive charts.</p>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <a class="btn sm" href="{{ url_for('history') }}">History</a>
-          <a class="btn sm" href="{{ url_for('analytics') }}">Analytics</a>
-        </div>
-      </div>
-    </div>
-
-    <div class="split-grid">
-      <div class="card">
-        <h3>Recent activity</h3>
-        <ul class="clean-list">
-          {% for item in recent_activity %}
-          <li>
-            <strong>{{ item.title }}</strong>
-            <div style="color:var(--muted); font-size:0.9rem; margin-top:2px;">{{ item.detail }}</div>
-          </li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Site highlights</h3>
-        <ul class="clean-list">
-          <li>Daily compliance snapshot from live data</li>
-          <li>AI detection workspace for images & video</li>
-          <li>Progressive web app experience</li>
-        </ul>
-        <div class="timeline" style="margin-top:16px;">
-          <div class="step"><div class="dot"></div><div class="text">Fresh inspection data reflected in dashboard metrics.</div></div>
-          <div class="step"><div class="dot"></div><div class="text">Violations routed into the analytics trend charts.</div></div>
-          <div class="step"><div class="dot"></div><div class="text">Export inspection history to CSV anytime.</div></div>
-        </div>
-      </div>
-    </div>
-
-    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+    </main>
   </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js');

@@ -22,20 +22,17 @@
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <div class="topbar">
-      <div class="brand">
-        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
-        <div>
-          <div class="brand-title">About SafeSite AI</div>
-          <div class="brand-sub">AI-powered PPE compliance monitoring for construction sites.</div>
+  <div class="app">
+    {% set active_page = 'about' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell">
+        <div class="topbar">
+          <div>
+            <h1>About SafeSite AI</h1>
+            <p class="subtitle">AI-powered PPE compliance monitoring for construction sites.</p>
+          </div>
         </div>
-      </div>
-      <div class="actions">
-        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
-        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
-      </div>
-    </div>
 
     <div class="card">
       <div class="split-grid" style="align-items:center;">
@@ -92,7 +89,10 @@
     </div>
 
     <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+    </div>
+    </main>
   </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js');

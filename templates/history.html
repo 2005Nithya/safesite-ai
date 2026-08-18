@@ -11,18 +11,20 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-  <div class="app-shell">
-    <div class="topbar">
-      <div>
-        <h1>Detection History</h1>
-        <p class="subtitle">Every inspection run on your site, logged with full compliance detail.</p>
-      </div>
-      <div class="actions">
-        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Back to dashboard</a>
-        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
-        <a class="btn" href="{{ url_for('export_history') }}">Export CSV</a>
-      </div>
-    </div>
+  <div class="app">
+    {% set active_page = 'history' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell">
+        <div class="topbar">
+          <div>
+            <h1>Detection History</h1>
+            <p class="subtitle">Every inspection run on your site, logged with full compliance detail.</p>
+          </div>
+          <div class="actions">
+            <a class="btn" href="{{ url_for('export_history') }}">Export CSV</a>
+          </div>
+        </div>
 
     <div class="metric-grid cols-3">
       <div class="metric-card">
@@ -93,6 +95,8 @@
     </div>
 
     <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+    </div>
+    </main>
   </div>
 
   <script>
@@ -105,6 +109,7 @@
       });
     });
   </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js');

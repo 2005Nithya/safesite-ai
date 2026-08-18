@@ -1,6 +1,9 @@
 import unittest
 
-from detection import evaluate_person_ppe
+import numpy as np
+
+import detection
+from detection import _prepare_frame_for_inference, evaluate_person_ppe, process_frame
 
 
 class DetectionLogicTests(unittest.TestCase):
@@ -33,6 +36,25 @@ class DetectionLogicTests(unittest.TestCase):
         )
         self.assertFalse(helmet_found)
         self.assertFalse(vest_found)
+
+    def test_prepare_frame_for_inference_resizes_large_frames(self):
+        frame = np.zeros((1200, 1600, 3), dtype=np.uint8)
+        prepared = _prepare_frame_for_inference(frame, target_size=320)
+        self.assertEqual(prepared.shape[0], 240)
+        self.assertEqual(prepared.shape[1], 320)
+
+    def test_process_frame_falls_back_when_model_is_unavailable(self):
+        original_model = detection._model
+        detection._model = None
+        detection._get_model = lambda: None
+        try:
+            frame = np.zeros((120, 160, 3), dtype=np.uint8)
+            processed, workers, safe_workers, violations = process_frame(frame)
+            self.assertEqual(processed.shape, frame.shape)
+            self.assertEqual((workers, safe_workers, violations), (0, 0, 0))
+        finally:
+            detection._model = original_model
+            detection._get_model = lambda: detection._model
 
 
 if __name__ == "__main__":

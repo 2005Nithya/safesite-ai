@@ -1,4 +1,6 @@
 import os
+import threading
+
 import cv2
 
 try:
@@ -8,9 +10,81 @@ except Exception:
 
 VIDEO_SUMMARY_FRAME_STRIDE = 4
 VIDEO_SUMMARY_MAX_FRAMES = 90
+DEFAULT_INFERENCE_IMGSZ = 320
+DEFAULT_CONFIDENCE = 0.25
 
-# Load model once when the dependency is available.
-model = YOLO("best (1).pt") if YOLO else None
+# Model is loaded lazily on first detection so the app boots light
+# (keeps the deployed free tier from running out of memory at startup).
+_model_lock = threading.Lock()
+_model = None
+MODEL_PATH = os.getenv("SAFESITE_MODEL_PATH", "best (1).pt")
+
+
+def _get_model():
+    """Load the YOLO model once, on first use. Returns None if unavailable."""
+    global _model
+    if _model is not None:
+        return _model
+    if YOLO is None:
+        return None
+    with _model_lock:
+        if _model is not None:
+            return _model
+        try:
+            _model = YOLO(MODEL_PATH)
+        except Exception:
+            _model = None
+    return _model
+
+
+def is_model_ready():
+    """True once the model has been loaded (non-blocking)."""
+    return _model is not None
+
+
+class _EmptyInferenceResults:
+    def __init__(self):
+        self.boxes = []
+
+
+def _prepare_frame_for_inference(frame, target_size=DEFAULT_INFERENCE_IMGSZ):
+    if frame is None:
+        return None
+
+    height, width = frame.shape[:2]
+    if max(height, width) <= target_size:
+        return frame
+
+    scale = target_size / max(height, width)
+    new_width = max(1, int(round(width * scale)))
+    new_height = max(1, int(round(height * scale)))
+    return cv2.resize(frame, (new_width, new_height))
+
+
+def _run_model(frame):
+    if frame is None or frame.size == 0:
+        raise RuntimeError("Frame is empty")
+
+    model = _get_model()
+
+    if model is None:
+        return _EmptyInferenceResults(), 1.0, 1.0
+
+    try:
+        inference_frame = _prepare_frame_for_inference(frame)
+        results = model(
+            inference_frame,
+            imgsz=DEFAULT_INFERENCE_IMGSZ,
+            conf=DEFAULT_CONFIDENCE,
+            stream=False,
+            verbose=False,
+        )[0]
+
+        scale_x = frame.shape[1] / inference_frame.shape[1]
+        scale_y = frame.shape[0] / inference_frame.shape[0]
+        return results, scale_x, scale_y
+    except Exception:
+        return _EmptyInferenceResults(), 1.0, 1.0
 
 
 def evaluate_person_ppe(person_box, helmets, nonhelmets, vests, overlap_threshold=0.25):
@@ -48,8 +122,10 @@ def evaluate_person_ppe(person_box, helmets, nonhelmets, vests, overlap_threshol
 
 def process_image(image_path):
     frame = cv2.imread(image_path)
+    if frame is None:
+        raise ValueError(f"Unable to read image: {image_path}")
 
-    results = model(frame)[0]
+    results, scale_x, scale_y = _run_model(frame)
 
     boxes = results.boxes
 
@@ -65,7 +141,11 @@ def process_image(image_path):
         if conf < 0.30:
             continue
 
-        x1, y1, x2, y2 = map(int, box.xyxy[0])
+        x1, y1, x2, y2 = map(float, box.xyxy[0])
+        x1 = int(x1 * scale_x)
+        y1 = int(y1 * scale_y)
+        x2 = int(x2 * scale_x)
+        y2 = int(y2 * scale_y)
 
         if cls == 3:
             persons.append((x1, y1, x2, y2))
@@ -150,11 +230,10 @@ def process_image(image_path):
 
 
 def process_frame(frame):
+    if frame is None or frame.size == 0:
+        raise ValueError("Frame is empty")
 
-    if model is None:
-        raise RuntimeError("YOLO model not loaded")
-
-    results = model(frame)[0]
+    results, scale_x, scale_y = _run_model(frame)
 
     persons = []
     helmets = []
@@ -169,7 +248,11 @@ def process_frame(frame):
         if conf < 0.30:
             continue
 
-        x1,y1,x2,y2 = map(int, box.xyxy[0])
+        x1, y1, x2, y2 = map(float, box.xyxy[0])
+        x1 = int(x1 * scale_x)
+        y1 = int(y1 * scale_y)
+        x2 = int(x2 * scale_x)
+        y2 = int(y2 * scale_y)
 
         if cls == 3:
             persons.append((x1,y1,x2,y2))

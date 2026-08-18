@@ -11,21 +11,17 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
 <body>
-  <div class="app-shell narrow">
-    <div class="topbar">
-      <div class="brand">
-        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
-        <div>
-          <div class="brand-title">Live Monitoring</div>
-          <div class="brand-sub">Hi {{ user_name }}, run real-time PPE detection on your camera or a demo feed.</div>
+  <div class="app">
+    {% set active_page = 'live' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell narrow">
+        <div class="topbar">
+          <div>
+            <h1>Live Monitoring</h1>
+            <p class="subtitle">Hi {{ user_name }}, run real-time PPE detection on your camera or a demo feed.</p>
+          </div>
         </div>
-      </div>
-      <div class="actions">
-        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
-        <a class="btn secondary" href="{{ url_for('history') }}">History</a>
-        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
-      </div>
-    </div>
 
     <div class="card">
       <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
@@ -52,9 +48,12 @@
     </div>
 
     <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+    </div>
+    </main>
   </div>
 
   <script>
+    const API_BASE_URL = {{ api_base_url | tojson }};
     const demoViewer = document.getElementById("streamViewer");
     const videoEl = document.getElementById("webcamVideo");
     const canvas = document.getElementById("frameCanvas");
@@ -73,6 +72,73 @@
       elm.style.display = 'none';
     }
 
+    function setStatus(message, kind = "info") {
+      statusText.textContent = message;
+      statusText.className = `chip ${kind}`;
+    }
+
+    function describeCameraError(err) {
+      if (!err) return "Camera access failed.";
+      const name = err.name || "";
+      const message = err.message || "";
+      if (name === "NotAllowedError" || message.includes("permission")) {
+        return "Camera permission was denied. Please allow camera access in the browser and refresh the page.";
+      }
+      if (name === "NotFoundError") {
+        return "No camera device was found. Connect a webcam or choose a different device.";
+      }
+      if (name === "NotReadableError") {
+        return "The camera is already in use by another app. Close other apps and try again.";
+      }
+      if (name === "OverconstrainedError") {
+        return "The camera settings requested by the page are not supported by this device. Please try again with the default settings.";
+      }
+      if (!window.isSecureContext) {
+        return "This page is not running in a secure context. Open it via localhost or https to use the webcam.";
+      }
+      return message || "Camera access failed. Please try again.";
+    }
+
+    async function getPreferredCameraStream() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const videoDevices = devices.filter(device => device.kind === 'videoinput');
+      const preferredDevice = videoDevices.find(device => !/(droidcam|droid cam|droid)/i.test(device.label));
+      const candidateDevices = [];
+
+      if (preferredDevice) {
+        candidateDevices.push(preferredDevice.deviceId);
+      }
+
+      const firstDevice = videoDevices[0];
+      if (firstDevice && !candidateDevices.includes(firstDevice.deviceId)) {
+        candidateDevices.push(firstDevice.deviceId);
+      }
+
+      for (const deviceId of candidateDevices) {
+        try {
+          return await navigator.mediaDevices.getUserMedia({
+            video: {
+              deviceId: { exact: deviceId },
+              width: { ideal: 1280 },
+              height: { ideal: 720 }
+            },
+            audio: false
+          });
+        } catch (err) {
+          if (err.name === 'NotFoundError' || err.name === 'OverconstrainedError') {
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      return navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+    }
+
     async function stopStream() {
       if (predictTimer) { clearInterval(predictTimer); predictTimer = null; }
       if (camStream) { camStream.getTracks().forEach(t => t.stop()); camStream = null; }
@@ -81,8 +147,7 @@
       hide(canvas);
       show(demoViewer);
       demoViewer.src = `${demoViewer.dataset.demoSrc}?t=${Date.now()}`;
-      statusText.textContent = "Stream stopped.";
-      statusText.className = "chip";
+      setStatus("Stream stopped.");
     }
 
     async function sendFrame() {
@@ -91,7 +156,8 @@
       try {
         ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
         const blob = await new Promise(res => canvas.toBlob(res, 'image/jpeg', 0.8));
-        const response = await fetch('/webcam_predict', { method: 'POST', body: blob });
+        const predictUrl = API_BASE_URL ? `${API_BASE_URL}/webcam_predict` : '/webcam_predict';
+        const response = await fetch(predictUrl, { method: 'POST', body: blob });
         const data = await response.json();
         if (data.error) throw new Error(data.error);
         resultImg.src = 'data:image/jpeg;base64,' + data.image;
@@ -101,8 +167,7 @@
           (data.violations > 0 ? ' · <span style="color:#ef4444">⚠ VIOLATIONS DETECTED</span>' : '');
         statusText.className = data.violations > 0 ? "chip bad" : "chip good";
       } catch (err) {
-        statusText.textContent = "Detection error: " + err.message;
-        statusText.className = "chip warn";
+        setStatus("Detection error: " + (err.message || err.name || "Unknown error"), "warn");
       } finally {
         inFlight = false;
       }
@@ -110,23 +175,30 @@
 
     document.getElementById("startWebcam").addEventListener("click", async () => {
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          throw new Error("This browser does not support webcam access.");
+        }
+
         if (!camStream) {
-          camStream = await navigator.mediaDevices.getUserMedia({
-            video: { width: { ideal: 640 }, height: { ideal: 360 } },
-            audio: false
-          });
+          try {
+            camStream = await getPreferredCameraStream();
+          } catch (firstError) {
+            camStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+          }
+
           videoEl.srcObject = camStream;
           await videoEl.play();
         }
+
         hide(demoViewer);
         hide(resultImg);
         show(videoEl);
-        predictTimer = setInterval(sendFrame, 250);
-        statusText.textContent = "Webcam running — AI detection active.";
-        statusText.className = "chip info";
+        if (predictTimer) { clearInterval(predictTimer); }
+        predictTimer = setInterval(sendFrame, 700);
+        setStatus("Webcam running — AI detection active.");
       } catch (err) {
-        statusText.textContent = "Could not start webcam: " + (err.message || err.name) + ". Allow camera permission and try again.";
-        statusText.className = "chip warn";
+        const message = describeCameraError(err);
+        setStatus(`Could not start webcam: ${message}`, "warn");
       }
     });
 
@@ -137,8 +209,7 @@
       hide(resultImg);
       show(demoViewer);
       demoViewer.src = `${demoViewer.dataset.demoSrc}?t=${Date.now()}`;
-      statusText.textContent = "Showing demo video feed.";
-      statusText.className = "chip info";
+      setStatus("Showing demo video feed.");
     });
 
     document.getElementById("stopStream").addEventListener("click", stopStream);

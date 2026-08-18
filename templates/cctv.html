@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | CCTV Monitoring</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app">
+    {% set active_page = 'cctv' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell narrow">
+        <div class="topbar">
+          <div>
+            <h1>CCTV Monitoring</h1>
+            <p class="subtitle">Hi {{ user_name }}, review site footage like a real security operations workflow.</p>
+          </div>
+        </div>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% endif %}
+
+    <div class="card">
+      <h3>Upload CCTV clip</h3>
+      <p style="color:var(--muted);">Drop in a camera feed from a construction site entry point or perimeter camera for PPE compliance review.</p>
+      <form action="{{ url_for('cctv') }}" method="post" enctype="multipart/form-data">
+        <div class="upload-zone">
+          <div class="big">📹</div>
+          <h3>Connect live CCTV or upload a clip</h3>
+          <p>Paste an RTSP or HTTP camera stream URL for live monitoring, or upload an MP4/AVI clip for review.</p>
+          <input type="text" name="camera_id" class="input" placeholder="Camera ID (e.g. CAM-01)" style="max-width:320px; margin:0 auto 10px;" />
+          <input type="text" name="site_zone" class="input" placeholder="Site zone (e.g. North Gate)" style="max-width:320px; margin:0 auto 10px;" />
+          <input type="text" name="incident_type" class="input" placeholder="Incident or review type" style="max-width:320px; margin:0 auto 10px;" />
+          <input type="url" name="stream_url" id="streamUrlInput" class="input" placeholder="http://IP-CAM:8080/video or @camera" style="max-width:320px; margin:0 auto 10px;" />
+          <label style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:10px; cursor:pointer; flex-wrap:wrap;">
+            <input type="checkbox" name="use_device" value="1" id="useDeviceCheck" style="width:18px;height:18px;" />
+            <strong>Use my PC / DroidCam camera</strong>
+            <span style="color:var(--muted);">(device index:</span>
+            <input type="number" name="device_index" value="1" min="0" max="9" style="width:60px;" />
+            <span style="color:var(--muted);">)</span>
+          </label>
+          <p style="color:var(--muted); font-size:0.9rem; margin:0 auto 10px; max-width:400px; text-align:left; line-height:1.6;">
+            <strong>DroidCam setup:</strong> open the DroidCam phone app, connect it in the PC
+            DroidCam client (USB or WiFi), then tick <strong>"Use my PC / DroidCam camera"</strong>
+            and hit Analyze. Device index is usually 1 when your laptop camera is 0.
+            <br />For a true IP camera stream paste an MJPEG URL like
+            <strong>http://&lt;phone-ip&gt;:8080/video</strong>.
+          </p>
+          <div style="display:flex; justify-content:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+            <button type="button" id="testStreamBtn" class="btn secondary">Test connection</button>
+            <button type="submit" style="margin-top:0;">Analyze CCTV Feed</button>
+          </div>
+          <p id="streamStatusMessage" style="color:var(--muted); font-size:0.9rem; margin:0 auto; max-width:360px;">Enter a URL and test it before connecting.</p>
+          <input type="file" name="file" accept="video/*" style="margin:0 auto; display:block; max-width:360px;" />
+        </div>
+      </form>
+    </div>
+
+    {% if workers is defined or safe_workers is defined or violations is defined %}
+    <div class="card">
+      <h3>Site inspection summary</h3>
+      <div class="metric-grid cols-3">
+        <div class="metric-card {% if violations == 0 %}green{% else %}red{% endif %}" id="siteStatusCard">
+          <span class="label">Site status</span>
+          <span class="value" id="siteStatusValue">{% if violations == 0 %}Safe{% else %}Unsafe{% endif %}</span>
+        </div>
+        <div class="metric-card">
+          <span class="label">Workers</span>
+          <span class="value" id="workersValue">{{ workers or 0 }}</span>
+        </div>
+        <div class="metric-card {% if violations == 0 %}green{% else %}red{% endif %}" id="violationsCard">
+          <span class="label">Violations</span>
+          <span class="value" id="violationsValue">{{ violations or 0 }}</span>
+        </div>
+      </div>
+      {% if stream_url %}
+      <p class="chip info" id="streamStatusNote" style="margin-top:14px;">Waiting for live detection…</p>
+      {% endif %}
+
+      <div class="card" style="margin-top:20px; box-shadow:none; background:var(--panel-2);">
+        <h3>Camera context</h3>
+        <p style="color:var(--muted);">Camera: <strong>{{ camera_id or 'CAM-UNKNOWN' }}</strong></p>
+        <p style="color:var(--muted);">Zone: <strong>{{ site_zone or 'Main site' }}</strong></p>
+        <p style="color:var(--muted);">Review type: <strong>{{ incident_type or 'Routine review' }}</strong></p>
+        {% if device_mode %}
+        <p style="color:var(--muted);">Source: <strong>PC / DroidCam camera device (index {{ device_index }})</strong></p>
+        {% elif stream_source %}
+        <p style="color:var(--muted);">Live stream source: <strong>{{ stream_source }}</strong></p>
+        {% endif %}
+      </div>
+
+      <div class="result-grid" style="margin-top:20px;">
+        <div class="card" style="box-shadow:none; background:var(--panel-2);">
+          <h3>Original CCTV clip</h3>
+          {% if uploaded_media %}
+          <video class="media" controls preload="metadata">
+            <source src="{{ url_for('static', filename=uploaded_media) }}" type="{{ uploaded_video_mime }}" />
+          </video>
+          {% endif %}
+        </div>
+        <div class="card" style="box-shadow:none; background:var(--panel-2);">
+          <h3>Processed footage</h3>
+          {% if stream_url %}
+          <img class="media" id="liveStreamImg" src="{{ stream_url }}" alt="Live CCTV stream" />
+          {% if device_mode %}
+          <p style="color:var(--muted); font-size:0.9rem; margin-top:12px;">Live from your PC's camera device (index {{ device_index }}). If this stays blank, open the DroidCam client, connect your phone, then reload.</p>
+          {% else %}
+          <p style="color:var(--muted); font-size:0.9rem; margin-top:12px;">This is the live processed camera feed. If it stays blank, check the stream URL is a valid MJPEG address.</p>
+          {% endif %}
+          {% elif result_stream_url %}
+          <img class="media" src="{{ result_stream_url }}" alt="Processed CCTV footage" />
+          {% endif %}
+          <p style="color:var(--muted); font-size:0.9rem; margin-top:12px;">This feed mirrors a real CCTV review workflow with camera metadata stored in the inspection log.</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+    </div>
+    </main>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    const streamUrlInput = document.getElementById('streamUrlInput');
+    const testStreamBtn = document.getElementById('testStreamBtn');
+    const streamStatusMessage = document.getElementById('streamStatusMessage');
+
+    if (testStreamBtn && streamUrlInput && streamStatusMessage) {
+      testStreamBtn.addEventListener('click', async () => {
+        let value = (streamUrlInput.value || '').trim();
+        if (!value) {
+          streamStatusMessage.textContent = 'Enter a stream URL first.';
+          streamStatusMessage.style.color = 'var(--warn)';
+          return;
+        }
+
+        if (!value.startsWith('http://') && !value.startsWith('https://') && !value.startsWith('rtsp://') && !value.startsWith('rtmp://')) {
+          if (value.startsWith('localhost') || value.startsWith('127.0.0.1')) {
+            value = `http://${value}`;
+          } else if (value.includes(':') && !value.includes('/')) {
+            value = `http://${value}`;
+          } else if (value.includes(':') && value.split(':').length === 2) {
+            value = `http://${value}`;
+          }
+        }
+
+        streamUrlInput.value = value;
+        streamStatusMessage.textContent = 'Testing connection...';
+        streamStatusMessage.style.color = 'var(--muted)';
+
+        // For a live video stream the body never ends, so we only read the
+        // response headers and then abort. Headers arriving proves the server
+        // is reachable; aborting is expected, not an error.
+        try {
+          const controller = new AbortController();
+          let response = null;
+          try {
+            response = await fetch(value, { method: 'GET', signal: controller.signal });
+            controller.abort();
+          } catch (err) {
+            if (err.name !== 'AbortError') throw err;
+          }
+
+          if (response && response.ok) {
+            streamStatusMessage.textContent = 'Connection looks good. You can now analyze the feed.';
+            streamStatusMessage.style.color = '#16a34a';
+          } else if (response) {
+            streamStatusMessage.textContent = `The server replied with ${response.status}. Check the URL or DroidCam status.`;
+            streamStatusMessage.style.color = '#dc2626';
+          } else {
+            streamStatusMessage.textContent = 'Server responded — connection looks good. You can now analyze the feed.';
+            streamStatusMessage.style.color = '#16a34a';
+          }
+        } catch (error) {
+          streamStatusMessage.textContent = 'Connection failed. Verify DroidCam is connected to the phone and the "Video over HTTP" webcam server is enabled, then retry.';
+          streamStatusMessage.style.color = '#dc2626';
+        }
+      });
+    }
+
+    {% if stream_url %}
+    // Live mode: poll the server for real detection counts and update the summary cards.
+    {% if device_mode %}
+    const statusEndpoint = '{{ url_for("cctv_device_status") }}';
+    const statusParams = 'index={{ device_index }}';
+    {% else %}
+    const statusEndpoint = '{{ url_for("cctv_stream_status") }}';
+    const STATUS_SOURCE = {{ stream_source | tojson }};
+    const statusParams = 'source=' + encodeURIComponent(STATUS_SOURCE);
+    {% endif %}
+
+    const siteStatusCard = document.getElementById('siteStatusCard');
+    const siteStatusValue = document.getElementById('siteStatusValue');
+    const workersValue = document.getElementById('workersValue');
+    const violationsValue = document.getElementById('violationsValue');
+    const violationsCard = document.getElementById('violationsCard');
+    const streamStatusNote = document.getElementById('streamStatusNote');
+
+    async function pollStreamStatus() {
+      try {
+        const res = await fetch(statusEndpoint + '?' + statusParams + '&t=' + Date.now());
+        const data = await res.json();
+        if (data && data.error) {
+          streamStatusNote.textContent = 'Stream error: ' + data.error;
+          streamStatusNote.className = 'chip bad';
+        } else if (data && data.updated) {
+          const safe = data.status === 'SAFE';
+          workersValue.textContent = data.workers;
+          violationsValue.textContent = data.violations;
+          siteStatusValue.textContent = safe ? 'Safe' : 'Unsafe';
+          siteStatusCard.className = 'metric-card ' + (safe ? 'green' : 'red');
+          violationsCard.className = 'metric-card ' + (data.violations > 0 ? 'red' : 'green');
+          streamStatusNote.textContent = 'Live detection active — last update ' + new Date(data.updated * 1000).toLocaleTimeString();
+          streamStatusNote.className = 'chip ' + (safe ? 'good' : 'bad');
+        } else {
+          streamStatusNote.textContent = 'Waiting for live detection… the first frame can take a few seconds while the AI model finishes loading.';
+          streamStatusNote.className = 'chip info';
+        }
+      } catch (e) {
+        streamStatusNote.textContent = 'Could not reach the stream status endpoint.';
+        streamStatusNote.className = 'chip warn';
+      }
+    }
+
+    setInterval(pollStreamStatus, 1500);
+    pollStreamStatus();
+    {% endif %}
+  </script>
+</body>
+</html>

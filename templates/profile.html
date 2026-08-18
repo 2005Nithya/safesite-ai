@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Profile Settings</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .settings-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row strong { display: block; }
+    .settings-row span { color: var(--muted); font-size: 0.88rem; }
+    .avatar { width: 76px; height: 76px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; font-size: 1.5rem; color: #fff; background: var(--grad); box-shadow: 0 10px 22px rgba(37,99,235,0.25); }
+    .info-item { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); font-size: 0.93rem; }
+    .info-item:last-child { border-bottom: none; }
+    .info-item span { color: var(--muted); }
+    .info-item strong { font-weight: 600; word-break: break-all; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell narrow">
+        <div class="topbar">
+          <div>
+            <h1>Profile Settings</h1>
+            <p class="subtitle">Manage your account, appearance, and notifications.</p>
+          </div>
+          <div class="actions">
+            <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
+          </div>
+        </div>
+
+        <div class="split-grid">
+          <div class="card">
+            <div style="display:flex; gap:16px; align-items:center; margin-bottom:20px;">
+              <div class="avatar">{{ (user_name or 'U')[:1]|upper }}{{ (user_name or '')[1:2]|upper }}</div>
+              <div>
+                <h3 style="margin-bottom:2px;">{{ user_name }}</h3>
+                <p style="color:var(--muted); margin:0;">{{ user_email or 'No email set' }}</p>
+              </div>
+            </div>
+            <h3>Edit profile</h3>
+            <form method="post" class="form-grid">
+              <label style="font-size:0.9rem; font-weight:700;">Display name
+                <input class="input" type="text" name="name" value="{{ user_name }}" required style="margin-top:6px;" />
+              </label>
+              <label style="font-size:0.9rem; font-weight:700;">Contact email
+                <input class="input" type="email" name="email" value="{{ user_email }}" style="margin-top:6px;" />
+              </label>
+              <button class="btn" type="submit">Save changes</button>
+            </form>
+            {% if saved %}<p style="color:var(--success); font-weight:700; margin-top:12px;">✓ Profile updated</p>{% endif %}
+          </div>
+
+          <div class="card">
+            <h3>Preferences</h3>
+            <div class="settings-row">
+              <div><strong>Dark theme</strong><span>Switch to a darker, low-glare interface</span></div>
+              <label class="switch"><input type="checkbox" data-theme-toggle /><span class="slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <div><strong>Violation sound alerts</strong><span>Play an alert sound on detections</span></div>
+              <label class="switch"><input type="checkbox" data-alert-toggle /><span class="slider"></span></label>
+            </div>
+            <div class="settings-row">
+              <div><strong>Email notifications</strong><span>Receive summary alerts by email</span></div>
+              <label class="switch"><input type="checkbox" data-email-toggle /><span class="slider"></span></label>
+            </div>
+
+            <h3 style="margin-top:24px;">Account info</h3>
+            <div class="info-item"><span>Name</span><strong>{{ user_name }}</strong></div>
+            <div class="info-item"><span>Email</span><strong>{{ user_email or '—' }}</strong></div>
+            <div class="info-item"><span>User ID</span><strong style="font-size:0.82rem;">{{ user_uid }}</strong></div>
+            <div class="info-item"><span>Status</span><span class="chip good">● Signed in</span></div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>

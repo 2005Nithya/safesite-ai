@@ -14,84 +14,104 @@
     .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .chart-wrap { position: relative; height: 300px; }
     @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+    .insight-card { display: flex; gap: 14px; align-items: flex-start; padding: 16px; border-radius: var(--radius-md); background: var(--panel-2); border: 1px solid var(--border); }
+    .insight-card .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 1.1rem; background: #eaf2ff; flex-shrink: 0; }
+    .insight-card h4 { margin: 0 0 4px; font-size: 0.98rem; }
+    .insight-card p { margin: 0; color: var(--muted); font-size: 0.9rem; }
   </style>
 </head>
 <body>
-  <div class="app-shell">
-    <div class="topbar">
-      <div class="brand">
-        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
-        <div>
-          <div class="brand-title">Analytics Overview</div>
-          <div class="brand-sub">Compliance and inspection trends from your detection history.</div>
+  <div class="app">
+    {% set active_page = 'analytics' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell">
+        <div class="topbar">
+          <div>
+            <h1>Analytics Overview</h1>
+            <p class="subtitle">Compliance and inspection trends from your detection history.</p>
+          </div>
         </div>
-      </div>
-      <div class="actions">
-        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
-        <a class="btn secondary" href="{{ url_for('history') }}">History</a>
-        <a class="btn secondary" href="{{ url_for('about') }}">About</a>
-      </div>
-    </div>
 
-    <div class="metric-grid">
-      <div class="metric-card">
-        <span class="label">Inspections</span>
-        <span class="value">{{ metrics.total_inspections }}</span>
-      </div>
-      <div class="metric-card">
-        <span class="label">Workers detected</span>
-        <span class="value">{{ metrics.total_workers }}</span>
-      </div>
-      <div class="metric-card green">
-        <span class="label">Safe workers</span>
-        <span class="value">{{ metrics.total_safe }}</span>
-      </div>
-      <div class="metric-card red">
-        <span class="label">Total violations</span>
-        <span class="value">{{ metrics.total_violations }}</span>
-      </div>
-      <div class="metric-card amber">
-        <span class="label">Avg. compliance</span>
-        <span class="value">{{ metrics.avg_compliance }}%</span>
-      </div>
-      <div class="metric-card green">
-        <span class="label">Safe inspections</span>
-        <span class="value">{{ metrics.safe_count }}</span>
-      </div>
-      <div class="metric-card red">
-        <span class="label">Unsafe inspections</span>
-        <span class="value">{{ metrics.unsafe_count }}</span>
-      </div>
-    </div>
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span class="label">Inspections</span>
+            <span class="value" data-count="{{ metrics.total_inspections }}">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="label">Workers detected</span>
+            <span class="value" data-count="{{ metrics.total_workers }}">0</span>
+          </div>
+          <div class="metric-card green">
+            <span class="label">Safe workers</span>
+            <span class="value" data-count="{{ metrics.total_safe }}">0</span>
+          </div>
+          <div class="metric-card red">
+            <span class="label">Total violations</span>
+            <span class="value" data-count="{{ metrics.total_violations }}">0</span>
+          </div>
+          <div class="metric-card amber">
+            <span class="label">Avg. compliance</span>
+            <span class="value" data-count="{{ metrics.avg_compliance }}" data-suffix="%">0</span>
+          </div>
+          <div class="metric-card green">
+            <span class="label">Safe inspections</span>
+            <span class="value" data-count="{{ metrics.safe_count }}">0</span>
+          </div>
+          <div class="metric-card red">
+            <span class="label">Unsafe inspections</span>
+            <span class="value" data-count="{{ metrics.unsafe_count }}">0</span>
+          </div>
+        </div>
 
-    <div class="chart-grid">
-      <div class="card">
-        <h3>Inspections per day</h3>
-        <div class="chart-wrap">
-          <canvas id="inspectionsChart"></canvas>
+        <div class="card">
+          <h3>Insights</h3>
+          {% if insights %}
+          <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px;">
+            <div class="insight-card">
+              <div class="ic">📈</div>
+              <div><h4>Best day</h4><p>{{ insights.best_day }} with {{ insights.best_day_count }} inspection(s).</p></div>
+            </div>
+            <div class="insight-card">
+              <div class="ic">🏗️</div>
+              <div><h4>Busiest day</h4><p>{{ insights.busiest_day }} — highest inspection volume.</p></div>
+            </div>
+            <div class="insight-card">
+              <div class="ic">{% if insights.direction == 'up' %}🚀{% elif insights.direction == 'down' %}📉{% else %}➡️{% endif %}</div>
+              <div><h4>Compliance trend</h4><p>Trending {{ insights.direction }} — {{ insights.delta }} since the previous day.</p></div>
+            </div>
+            <div class="insight-card">
+              <div class="ic">🧰</div>
+              <div><h4>Violations per inspection</h4><p>{{ "%.2f"|format(metrics.total_violations / metrics.total_inspections if metrics.total_inspections else 0) }} violations on average per check.</p></div>
+            </div>
+          </div>
+          {% else %}
+          <p class="empty">Run a few detections to unlock performance insights.</p>
+          {% endif %}
         </div>
-      </div>
-      <div class="card">
-        <h3>Compliance trend (%)</h3>
-        <div class="chart-wrap">
-          <canvas id="complianceChart"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Site status breakdown</h3>
-        <div class="chart-wrap">
-          <canvas id="statusChart"></canvas>
-        </div>
-      </div>
-      <div class="card">
-        <h3>Files with the most violations</h3>
-        <div class="chart-wrap">
-          <canvas id="filesChart"></canvas>
-        </div>
-      </div>
-    </div>
 
-    <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+        <div class="chart-grid">
+          <div class="card">
+            <h3>Inspections per day</h3>
+            <div class="chart-wrap"><canvas id="inspectionsChart"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Compliance trend (%)</h3>
+            <div class="chart-wrap"><canvas id="complianceChart"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Site status breakdown</h3>
+            <div class="chart-wrap"><canvas id="statusChart"></canvas></div>
+          </div>
+          <div class="card">
+            <h3>Files with the most violations</h3>
+            <div class="chart-wrap"><canvas id="filesChart"></canvas></div>
+          </div>
+        </div>
+
+        <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+      </div>
+    </main>
   </div>
 
   {% if metrics.total_inspections %}
@@ -105,6 +125,23 @@
     const unsafeCount = {{ metrics.unsafe_count }};
 
     Chart.defaults.font.family = 'Inter, Segoe UI, sans-serif';
+    const isDark = document.documentElement.dataset.theme === 'dark';
+    const gridColor = isDark ? 'rgba(148,163,184,0.12)' : 'rgba(100,116,139,0.15)';
+    const tickColor = isDark ? '#94a3b8' : '#64748b';
+
+    const baseOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: tickColor } },
+        y: { grid: { color: gridColor }, ticks: { color: tickColor } }
+      },
+      plugins: { legend: { labels: { color: tickColor } } }
+    };
+
+    const barGradient = document.createElement('canvas').getContext('2d').createLinearGradient(0, 0, 0, 300);
+    barGradient.addColorStop(0, 'rgba(37,99,235,0.9)');
+    barGradient.addColorStop(1, 'rgba(59,130,246,0.35)');
 
     new Chart(document.getElementById('inspectionsChart'), {
       type: 'bar',
@@ -113,14 +150,19 @@
         datasets: [{
           label: 'Inspections',
           data: counts,
-          backgroundColor: 'rgba(37,99,235,0.75)',
+          backgroundColor: barGradient,
           borderColor: '#2563eb',
           borderWidth: 1,
-          borderRadius: 8
+          borderRadius: 8,
+          maxBarThickness: 46
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+      options: { ...baseOptions, plugins: { legend: { display: false } } }
     });
+
+    const lineGradient = document.createElement('canvas').getContext('2d').createLinearGradient(0, 0, 0, 300);
+    lineGradient.addColorStop(0, 'rgba(22,163,74,0.35)');
+    lineGradient.addColorStop(1, 'rgba(22,163,74,0)');
 
     new Chart(document.getElementById('complianceChart'), {
       type: 'line',
@@ -130,16 +172,20 @@
           label: 'Compliance %',
           data: compliance,
           borderColor: '#16a34a',
-          backgroundColor: 'rgba(22,163,74,0.15)',
+          backgroundColor: lineGradient,
           fill: true,
-          tension: 0.35,
-          pointBackgroundColor: '#16a34a'
+          tension: 0.4,
+          pointBackgroundColor: '#16a34a',
+          pointRadius: 4,
+          pointHoverRadius: 6
         }]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        scales: { y: { min: 0, max: 100, ticks: { callback: v => v + '%' } } }
+        ...baseOptions,
+        scales: {
+          ...baseOptions.scales,
+          y: { ...baseOptions.scales.y, min: 0, max: 100, ticks: { color: tickColor, callback: v => v + '%' } }
+        }
       }
     });
 
@@ -150,11 +196,16 @@
         datasets: [{
           data: [safeCount, unsafeCount],
           backgroundColor: ['#16a34a', '#dc2626'],
-          borderWidth: 2
+          borderWidth: 2,
+          hoverOffset: 8
         }]
       },
-      options: { responsive: true, maintainAspectRatio: false }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: tickColor, padding: 14 } } } }
     });
+
+    const redGradient = document.createElement('canvas').getContext('2d').createLinearGradient(0, 0, 300, 0);
+    redGradient.addColorStop(0, 'rgba(220,38,38,0.85)');
+    redGradient.addColorStop(1, 'rgba(239,68,68,0.4)');
 
     new Chart(document.getElementById('filesChart'), {
       type: 'bar',
@@ -163,18 +214,14 @@
         datasets: [{
           label: 'Violations',
           data: violations,
-          backgroundColor: 'rgba(220,38,38,0.75)',
+          backgroundColor: redGradient,
           borderColor: '#dc2626',
           borderWidth: 1,
-          borderRadius: 8
+          borderRadius: 8,
+          maxBarThickness: 22
         }]
       },
-      options: {
-        indexAxis: 'y',
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } }
-      }
+      options: { ...baseOptions, indexAxis: 'y', plugins: { legend: { display: false } } }
     });
   </script>
   {% else %}
@@ -184,6 +231,7 @@
     }
   </script>
   {% endif %}
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js');

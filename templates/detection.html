@@ -16,26 +16,21 @@
   </style>
 </head>
 <body>
-  <div class="app-shell narrow">
-    <div class="topbar">
-      <div class="brand">
-        <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
-        <div>
-          <div class="brand-title">Detection Workspace</div>
-          <div class="brand-sub">Hi {{ user_name }}, upload an image or video to monitor PPE compliance.</div>
+  <div class="app">
+    {% set active_page = 'detection' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell narrow">
+        <div class="topbar">
+          <div>
+            <h1>Detection Workspace</h1>
+            <p class="subtitle">Hi {{ user_name }}, upload an image or video to monitor PPE compliance.</p>
+          </div>
         </div>
-      </div>
-      <div class="actions">
-        <a class="btn secondary" href="{{ url_for('dashboard') }}">← Dashboard</a>
-        <a class="btn secondary" href="{{ url_for('history') }}">History</a>
-        <a class="btn secondary" href="{{ url_for('analytics') }}">Analytics</a>
-        <a class="btn secondary" href="{{ url_for('about') }}">About</a>
-      </div>
-    </div>
 
-    {% if error %}
-    <div class="error-box">{{ error }}</div>
-    {% endif %}
+        {% if error %}
+        <div class="error-box">{{ error }}</div>
+        {% endif %}
 
     <div class="card">
       <h3>Run a detection</h3>
@@ -148,7 +143,10 @@
     {% endif %}
 
     <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · AI-powered construction safety monitoring</div>
+      </div>
+    </main>
   </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
   <script>
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/service-worker.js');

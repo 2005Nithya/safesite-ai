@@ -1,22 +1,12 @@
 services:
   - type: web
     name: safesite-ai
-    runtime: python
+    env: python
     plan: free
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn --workers 1 --threads 4 --timeout 300 app:app"
+    startCommand: "gunicorn app:app --workers 1 --threads 4 --timeout 300"
     envVars:
       - key: SECRET_KEY
         generateValue: true
-      - key: FIREBASE_API_KEY
-        sync: false
-      - key: FIREBASE_AUTH_DOMAIN
-        sync: false
-      - key: FIREBASE_PROJECT_ID
-        sync: false
-      - key: FIREBASE_STORAGE_BUCKET
-        sync: false
-      - key: FIREBASE_MESSAGING_SENDER_ID
-        sync: false
-      - key: FIREBASE_APP_ID
-        sync: false
+      - key: SESSION_COOKIE_SECURE
+        value: "false"

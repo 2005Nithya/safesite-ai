@@ -1,8 +1,11 @@
 from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
 from pathlib import Path
 import os
+import re
 import requests
 import time
+from urllib.parse import quote
+from werkzeug.middleware.proxy_fix import ProxyFix
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
 from reportlab.lib import colors
 from reportlab.lib.units import inch
@@ -10,10 +13,14 @@ from reportlab.lib.styles import getSampleStyleSheet
 import json
 from datetime import datetime
 from flask import Response
-from video_detection import generate_camera_frames, generate_frames
+from video_detection import STREAM_STATUS, generate_camera_frames, generate_device_frames, generate_frames, generate_stream_frames
 from flask import Response
 import cv2
-from detection import process_frame
+try:
+    from detection import process_frame
+except Exception:
+    def process_frame(frame):
+        return frame, 0, 0, 0
 import base64
 import numpy as np
 
@@ -29,6 +36,12 @@ except Exception:
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "safesite-ai-dev-key")
 
+ADMIN_PASSWORD = os.getenv("ADMIN_PASSWORD", "admin123")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_port=1)
+app.config["SESSION_COOKIE_SECURE"] = os.getenv("SESSION_COOKIE_SECURE", "true").lower() == "true"
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["API_BASE_URL"] = (os.getenv("API_BASE_URL") or "").rstrip("/")
+
 UPLOAD_FOLDER = "static/uploads"
 RESULT_FOLDER = "static/results"
 
@@ -43,6 +56,26 @@ def _to_static_filename(path):
     return normalized
 
 
+def normalize_stream_source(source):
+    source = (source or "").strip()
+    if not source:
+        return source
+
+    if source.startswith(("http://", "https://", "rtsp://", "rtmp://")):
+        return source
+
+    if source.startswith(("localhost", "127.0.0.1")):
+        return f"http://{source}"
+
+    if re.match(r"^\d+\.\d+\.\d+\.\d+:[0-9]+(/.*)?$", source):
+        return f"http://{source}"
+
+    if ":" in source and "/" not in source:
+        return f"http://{source}"
+
+    return source
+
+
 def _guess_video_mime(filename):
     extension = Path(filename or "").suffix.lower()
     return {
@@ -52,6 +85,20 @@ def _guess_video_mime(filename):
         ".avi": "video/x-msvideo",
         ".mkv": "video/x-matroska",
     }.get(extension, "video/mp4")
+
+
+def _append_history_record(record):
+    history_file = "history.json"
+    try:
+        with open(history_file, "r", encoding="utf-8") as handle:
+            history = json.load(handle)
+    except Exception:
+        history = []
+
+    history.append(record)
+
+    with open(history_file, "w", encoding="utf-8") as handle:
+        json.dump(history, handle, indent=4)
 
 
 def _load_env_file():
@@ -83,6 +130,11 @@ def get_firebase_config():
 
 
 FIREBASE_CONFIG = get_firebase_config()
+
+
+@app.route("/health")
+def health():
+    return jsonify({"status": "ok"})
 
 
 @app.route("/health/firebase")
@@ -200,6 +252,7 @@ def detection():
         "detection.html",
         firebase_config=FIREBASE_CONFIG,
         user_name=session.get("user_name", "Captain"),
+        api_base_url=app.config.get("API_BASE_URL", ""),
     )
 
 
@@ -260,28 +313,19 @@ def predict():
     session["result_image"] = result_path
     session["uploaded_media_type"] = media_type
     session["result_media_type"] = media_type
-    history_file = "history.json"
-
     record = {
-    "date": datetime.now().strftime("%d-%m-%Y %I:%M %p"),
-    "file": file.filename,
-    "workers": workers,
-    "safe_workers": safe_workers,
-    "violations": violations,
-    "compliance": round((safe_workers/workers)*100,1) if workers > 0 else 0,
-    "status": "SAFE" if violations == 0 else "UNSAFE"
+        "date": datetime.now().strftime("%d-%m-%Y %I:%M %p"),
+        "file": file.filename,
+        "workers": workers,
+        "safe_workers": safe_workers,
+        "violations": violations,
+        "compliance": round((safe_workers / workers) * 100, 1) if workers > 0 else 0,
+        "status": "SAFE" if violations == 0 else "UNSAFE",
+        "source": "Upload",
+        "source_type": media_type,
     }
 
-    try:
-        with open(history_file, "r") as f:
-            history = json.load(f)
-    except:
-            history = []
-
-    history.append(record)
-
-    with open(history_file, "w") as f:
-        json.dump(history, f, indent=4)
+    _append_history_record(record)
 
     return render_template(
         "detection.html",
@@ -298,6 +342,177 @@ def predict():
         violations=violations,
         detection_time=f"{detection_time} sec",
     )
+
+
+@app.route("/cctv", methods=["GET", "POST"])
+def cctv():
+    if request.method == "POST":
+        camera_id = request.form.get("camera_id", "").strip() or "CAM-UNKNOWN"
+        site_zone = request.form.get("site_zone", "").strip() or "Main site"
+        incident_type = request.form.get("incident_type", "").strip() or "Routine review"
+        stream_url = request.form.get("stream_url", "").strip()
+        use_device = request.form.get("use_device", "").strip()
+        device_index = 1
+        try:
+            device_index = int(request.form.get("device_index", "1") or 1)
+        except (TypeError, ValueError):
+            device_index = 1
+
+        if use_device in ("1", "on", "true", "yes") or stream_url == "@camera":
+            device_stream_url = url_for("cctv_device", index=device_index)
+            return render_template(
+                "cctv.html",
+                firebase_config=get_firebase_config(),
+                user_name=session.get("user_name", "Captain"),
+                device_mode=True,
+                device_index=device_index,
+                stream_url=device_stream_url,
+                camera_id=camera_id,
+                site_zone=site_zone,
+                incident_type=incident_type,
+                workers=0,
+                safe_workers=0,
+                violations=0,
+                detection_time="Live device feed",
+            )
+
+        if stream_url:
+            live_stream_url = url_for("cctv_stream", source=stream_url)
+            return render_template(
+                "cctv.html",
+                firebase_config=get_firebase_config(),
+                user_name=session.get("user_name", "Captain"),
+                stream_url=live_stream_url,
+                stream_source=stream_url,
+                camera_id=camera_id,
+                site_zone=site_zone,
+                incident_type=incident_type,
+                workers=0,
+                safe_workers=0,
+                violations=0,
+                detection_time="Connected live",
+            )
+
+        if "file" not in request.files:
+            return render_template("cctv.html", firebase_config=get_firebase_config(), user_name=session.get("user_name", "Captain"), error="No CCTV footage uploaded."), 400
+
+        file = request.files["file"]
+        if file.filename == "":
+            return render_template("cctv.html", firebase_config=get_firebase_config(), user_name=session.get("user_name", "Captain"), error="Please choose a CCTV clip first."), 400
+
+        os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
+        os.makedirs(app.config["RESULT_FOLDER"], exist_ok=True)
+
+        filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
+        file.save(filepath)
+
+        if not Path(filepath).suffix.lower() in {".mp4", ".avi", ".mov", ".mkv", ".webm"}:
+            return render_template(
+                "cctv.html",
+                firebase_config=get_firebase_config(),
+                user_name=session.get("user_name", "Captain"),
+                error="Please upload a video clip from a CCTV or camera feed.",
+            ), 400
+
+        workers, safe_workers, violations = summarize_video(filepath)
+        web_upload_path = _to_static_filename(os.path.join(app.config["UPLOAD_FOLDER"], file.filename))
+        uploaded_video_mime = _guess_video_mime(file.filename)
+        result_stream_url = url_for("processed_video_feed", filename=os.path.basename(filepath))
+
+        session["workers"] = workers
+        session["safe_workers"] = safe_workers
+        session["violations"] = violations
+        session["detection_time"] = "Live review"
+        session["uploaded_image"] = filepath
+        session["result_image"] = None
+        session["uploaded_media_type"] = "video"
+        session["result_media_type"] = "video"
+
+        record = {
+            "date": datetime.now().strftime("%d-%m-%Y %I:%M %p"),
+            "file": file.filename,
+            "workers": workers,
+            "safe_workers": safe_workers,
+            "violations": violations,
+            "compliance": round((safe_workers / workers) * 100, 1) if workers > 0 else 0,
+            "status": "SAFE" if violations == 0 else "UNSAFE",
+            "source": "CCTV upload",
+            "source_type": "video",
+            "camera_id": camera_id,
+            "site_zone": site_zone,
+            "incident_type": incident_type,
+        }
+        _append_history_record(record)
+
+        return render_template(
+            "cctv.html",
+            firebase_config=get_firebase_config(),
+            user_name=session.get("user_name", "Captain"),
+            uploaded_media=web_upload_path,
+            uploaded_media_type="video",
+            uploaded_video_mime=uploaded_video_mime,
+            result_stream_url=result_stream_url,
+            workers=workers,
+            safe_workers=safe_workers,
+            violations=violations,
+            detection_time="Live review",
+            camera_id=camera_id,
+            site_zone=site_zone,
+            incident_type=incident_type,
+        )
+
+    return render_template(
+        "cctv.html",
+        firebase_config=get_firebase_config(),
+        user_name=session.get("user_name", "Captain"),
+    )
+
+
+@app.route("/cctv/stream")
+def cctv_stream():
+    source = request.args.get("source", "")
+    normalized_source = normalize_stream_source(source)
+    if not normalized_source:
+        abort(400)
+
+    return Response(
+        generate_stream_frames(normalized_source),
+        mimetype="multipart/x-mixed-replace; boundary=frame"
+    )
+
+
+@app.route("/cctv/stream/status")
+def cctv_stream_status():
+    source = request.args.get("source", "")
+    key = normalize_stream_source(source)
+    info = STREAM_STATUS.get(key, {})
+    if key:
+        info = {"key": key, **info}
+    return jsonify(info)
+
+
+@app.route("/cctv/device")
+def cctv_device():
+    try:
+        index = int(request.args.get("index", 1))
+    except (TypeError, ValueError):
+        index = 1
+    index = min(max(index, 0), 9)
+    return Response(
+        generate_device_frames(f"device:{index}", camera_index=index),
+        mimetype="multipart/x-mixed-replace; boundary=frame"
+    )
+
+
+@app.route("/cctv/device/status")
+def cctv_device_status():
+    try:
+        index = int(request.args.get("index", 1))
+    except (TypeError, ValueError):
+        index = 1
+    index = min(max(index, 0), 9)
+    key = f"device:{index}"
+    return jsonify({"key": key, **STREAM_STATUS.get(key, {})})
 
 
 @app.route("/logout")
@@ -333,7 +548,11 @@ def processed_video_feed(filename):
 
 @app.route("/live")
 def live():
-    return render_template("live.html", user_name=session.get("user_name", "Captain"))
+    return render_template(
+        "live.html",
+        user_name=session.get("user_name", "Captain"),
+        api_base_url=app.config.get("API_BASE_URL", ""),
+    )
 
 
 @app.route("/video_feed")
@@ -366,10 +585,13 @@ def webcam_predict():
         frame = cv2.imdecode(np.frombuffer(data, np.uint8), cv2.IMREAD_COLOR)
         if frame is None:
             return jsonify({"error": "Invalid image"}), 400
-    except Exception:
-        return jsonify({"error": "Invalid image"}), 400
+    except Exception as exc:
+        return jsonify({"error": f"Invalid image: {exc}"}), 400
 
-    processed, workers, safe, violations = process_frame(frame)
+    try:
+        processed, workers, safe, violations = process_frame(frame)
+    except Exception as exc:
+        return jsonify({"error": f"Detection failed: {exc}"}), 500
 
     ok, encoded = cv2.imencode(".jpg", processed)
     if not ok:
@@ -589,6 +811,20 @@ def analytics():
         for k, v in trend.items()
     ]
 
+    insights = {}
+    if trend_data:
+        best = max(trend_data, key=lambda x: x["compliance"])
+        busiest = max(trend_data, key=lambda x: x["count"])
+        insights["best_day"] = best["day"]
+        insights["best_day_count"] = best["count"]
+        insights["busiest_day"] = busiest["day"]
+        insights["busiest_day_count"] = busiest["count"]
+    if len(trend_data) >= 2:
+        first = trend_data[0]["compliance"]
+        last = trend_data[-1]["compliance"]
+        insights["direction"] = "up" if last > first else ("down" if last < first else "flat")
+        insights["delta"] = round(abs(last - first), 1)
+
     return render_template(
         "analytics.html",
         firebase_config=get_firebase_config(),
@@ -604,6 +840,7 @@ def analytics():
         },
         trend_data=trend_data,
         top_files=top_files,
+        insights=insights,
     )
 
 
@@ -613,6 +850,81 @@ def about():
         "about.html",
         firebase_config=get_firebase_config(),
         user_name=session.get("user_name", "Captain"),
+    )
+
+
+@app.route("/admin", methods=["GET", "POST"])
+def admin():
+    error = None
+
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password == ADMIN_PASSWORD:
+            session["admin"] = True
+            return redirect(url_for("admin"))
+        error = "Incorrect admin password. Please try again."
+
+    records = _load_history()
+    total_inspections = len(records)
+    total_workers = sum(int(r.get("workers", 0)) for r in records)
+    total_violations = sum(int(r.get("violations", 0)) for r in records)
+    unsafe_count = sum(1 for r in records if r.get("status") != "SAFE")
+
+    storage_bytes = 0
+    for folder in (app.config["UPLOAD_FOLDER"], app.config["RESULT_FOLDER"]):
+        if os.path.isdir(folder):
+            for root, _, files in os.walk(folder):
+                for name in files:
+                    storage_bytes += os.path.getsize(os.path.join(root, name))
+    storage_mb = round(storage_bytes / (1024 * 1024), 1)
+
+    return render_template(
+        "admin.html",
+        firebase_config=get_firebase_config(),
+        user_name=session.get("user_name", "Captain"),
+        active_page="admin",
+        is_admin=session.get("admin", False),
+        error=error,
+        stats={
+            "inspections": total_inspections,
+            "workers": total_workers,
+            "violations": total_violations,
+            "unsafe": unsafe_count,
+            "storage_mb": storage_mb,
+        },
+        recent=records[-8:][::-1],
+        firebase_ready=bool(FIREBASE_CONFIG.get("apiKey") and FIREBASE_CONFIG.get("projectId")),
+    )
+
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("admin", None)
+    return redirect(url_for("admin"))
+
+
+@app.route("/profile", methods=["GET", "POST"])
+def profile():
+    saved = False
+
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip()
+        if name:
+            session["user_name"] = name
+        if email:
+            session["user_email"] = email
+        saved = True
+        return redirect(url_for("profile"))
+
+    return render_template(
+        "profile.html",
+        firebase_config=get_firebase_config(),
+        user_name=session.get("user_name", "Captain"),
+        user_email=session.get("user_email", ""),
+        user_uid=session.get("user_uid", "local-user"),
+        active_page="profile",
+        saved=saved,
     )
 
 

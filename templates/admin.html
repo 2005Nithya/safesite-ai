@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Admin Panel</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .auth-gate { max-width: 430px; margin: 8vh auto; }
+    .settings-row { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border); }
+    .settings-row:last-child { border-bottom: none; }
+    .settings-row strong { display: block; }
+    .settings-row span { color: var(--muted); font-size: 0.88rem; }
+  </style>
+</head>
+<body>
+  {% if not is_admin %}
+  <div class="app">
+    <div class="main">
+      <div class="auth-gate">
+        <div class="card" style="animation:none;">
+          <div style="text-align:center; margin-bottom:18px;">
+            <div style="font-size:2.4rem;">🛠️</div>
+            <h2 style="margin-top:6px;">Admin Panel</h2>
+            <p style="color:var(--muted);">This area is restricted. Enter the admin password to continue.</p>
+          </div>
+          {% if error %}
+          <div class="error-box">{{ error }}</div>
+          {% endif %}
+          <form method="post" class="form-grid">
+            <input class="input" type="password" name="password" placeholder="Admin password" required autofocus />
+            <button class="btn" type="submit">Unlock admin panel</button>
+          </form>
+          <p style="text-align:center; margin-top:16px;">
+            <a class="btn ghost sm" href="{{ url_for('dashboard') }}">← Back to dashboard</a>
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% else %}
+  <div class="app">
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell">
+        <div class="topbar">
+          <div class="brand">
+            <img src="{{ url_for('static', filename='logo.jpeg') }}" alt="SafeSite AI logo" />
+            <div>
+              <div class="brand-title">Admin Panel</div>
+              <div class="brand-sub">System overview and management</div>
+            </div>
+          </div>
+          <div class="actions">
+            <span class="chip good">● Admin session active</span>
+            <a class="btn danger sm" href="{{ url_for('admin_logout') }}">Lock panel</a>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric-card">
+            <span class="label">Total inspections</span>
+            <span class="value" data-count="{{ stats.inspections }}">0</span>
+          </div>
+          <div class="metric-card">
+            <span class="label">Workers detected</span>
+            <span class="value" data-count="{{ stats.workers }}">0</span>
+          </div>
+          <div class="metric-card red">
+            <span class="label">Violations</span>
+            <span class="value" data-count="{{ stats.violations }}">0</span>
+            <span class="hint">{{ stats.unsafe }} unsafe inspections</span>
+          </div>
+          <div class="metric-card">
+            <span class="label">Storage used</span>
+            <span class="value">{{ stats.storage_mb }}<small style="font-size:0.9rem;"> MB</small></span>
+          </div>
+        </div>
+
+        <div class="split-grid">
+          <div class="card">
+            <h3>Quick actions</h3>
+            <div style="display:flex; gap:10px; flex-wrap:wrap;">
+              <a class="btn secondary sm" href="{{ url_for('export_history') }}">Export history CSV</a>
+              <a class="btn danger sm" href="{{ url_for('detection') }}">Run detection</a>
+              <form action="{{ url_for('clear_history') }}" method="post" onsubmit="return confirm('Clear all detection history? This cannot be undone.');">
+                <button class="btn danger sm" type="submit">Clear history</button>
+              </form>
+            </div>
+          </div>
+          <div class="card">
+            <h3>Configuration status</h3>
+            <div class="settings-row">
+              <div><strong>Firebase</strong><span>Authentication service</span></div>
+              <span class="chip {% if firebase_ready %}good{% else %}bad{% endif %}">{{ '● Connected' if firebase_ready else '● Not configured' }}</span>
+            </div>
+            <div class="settings-row">
+              <div><strong>AI model</strong><span>PPE detection engine</span></div>
+              <span class="chip good">● Loaded</span>
+            </div>
+            <div class="settings-row">
+              <div><strong>Admin access</strong><span>Password protected</span></div>
+              <span class="chip info">● Secure</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>Recent detections</h3>
+          {% if recent %}
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr><th>Date</th><th>File</th><th>Workers</th><th>Violations</th><th>Compliance</th><th>Status</th></tr>
+              </thead>
+              <tbody>
+                {% for r in recent %}
+                <tr>
+                  <td>{{ r.date }}</td>
+                  <td>{{ r.file }}</td>
+                  <td>{{ r.workers }}</td>
+                  <td>{{ r.violations }}</td>
+                  <td>{{ r.compliance }}%</td>
+                  <td>
+                    {% if r.status == "SAFE" %}<span class="chip good">● Safe</span>
+                    {% else %}<span class="chip bad">● Unsafe</span>{% endif %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% else %}
+          <p class="empty">No detections yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    </main>
+  </div>
+  {% endif %}
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/service-worker.js');
+    }
+  </script>
+</body>
+</html>
