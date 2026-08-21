@@ -12,13 +12,18 @@
     <a href="{{ url_for('dashboard') }}" class="side-link {% if active_page == 'dashboard' %}active{% endif %}"><span>📊</span> Dashboard</a>
     <a href="{{ url_for('detection') }}" class="side-link {% if active_page == 'detection' %}active{% endif %}"><span>🛡️</span> Detection</a>
     <a href="{{ url_for('cctv') }}" class="side-link {% if active_page == 'cctv' %}active{% endif %}"><span>📹</span> CCTV</a>
+    <a href="{{ url_for('cctv_grid') }}" class="side-link {% if active_page == 'cctv_grid' %}active{% endif %}"><span>🎛️</span> Multi-Cam Grid</a>
     <a href="{{ url_for('live') }}" class="side-link {% if active_page == 'live' %}active{% endif %}"><span>📷</span> Live Monitoring</a>
     <a href="{{ url_for('history') }}" class="side-link {% if active_page == 'history' %}active{% endif %}"><span>🗂️</span> History</a>
     <a href="{{ url_for('analytics') }}" class="side-link {% if active_page == 'analytics' %}active{% endif %}"><span>📈</span> Analytics</a>
+    <a href="{{ url_for('heatmap') }}" class="side-link {% if active_page == 'heatmap' %}active{% endif %}"><span>🔥</span> Hazard Heatmap</a>
+    <a href="{{ url_for('reports_schedule_page') }}" class="side-link {% if active_page == 'reports_schedule' %}active{% endif %}"><span>⏰</span> Scheduled Reports</a>
+    <a href="{{ url_for('assistant_page') }}" class="side-link {% if active_page == 'assistant' %}active{% endif %}"><span>🤖</span> AI Assistant</a>
   </nav>
 
   <div class="side-label">Account</div>
   <nav class="side-nav">
+    <a href="{{ url_for('alerts_page') }}" class="side-link {% if active_page == 'alerts' %}active{% endif %}"><span>🚨</span> Safety Alerts</a>
     <a href="{{ url_for('profile') }}" class="side-link {% if active_page == 'profile' %}active{% endif %}"><span>⚙️</span> Profile Settings</a>
     <a href="{{ url_for('admin') }}" class="side-link {% if active_page == 'admin' %}active{% endif %}"><span>🛠️</span> Admin Panel</a>
   </nav>

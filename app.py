@@ -1,5 +1,6 @@
 from flask import Flask, abort, jsonify, redirect, render_template, request, session, url_for
 from pathlib import Path
+from html import escape as html_escape
 import os
 import re
 import requests
@@ -99,6 +100,28 @@ def _append_history_record(record):
 
     with open(history_file, "w", encoding="utf-8") as handle:
         json.dump(history, handle, indent=4)
+
+    # Automatically dispatch real safety alerts if violations > 0
+    violations = record.get("violations", 0)
+    if violations > 0:
+        email_to = session.get("alert_email", "nithyasheejain@gmail.com")
+        phone_to = session.get("alert_phone", "+15550192834")
+        subject = f"🚨 SafeSite AI Hazard Alert: {violations} Violation(s) Detected!"
+        body = f"""
+        <h3>SafeSite AI Automated Hazard Dispatch</h3>
+        <p><b>Timestamp:</b> {record.get('date', 'N/A')}</p>
+        <p><b>Source File:</b> {record.get('file', 'N/A')}</p>
+        <p><b>Workers Detected:</b> {record.get('workers', 0)}</p>
+        <p><b>Violations Flagged:</b> <span style="color:red; font-weight:bold;">{violations}</span></p>
+        <p><b>Status:</b> {record.get('status', 'UNSAFE')}</p>
+        <p>Please log in to SafeSite AI to review inspection logs and take corrective action immediately.</p>
+        """
+        try:
+            send_safety_email(email_to, subject, body)
+            if session.get("sms_enabled", True):
+                send_safety_sms(phone_to, f"SafeSite AI Alert: {violations} safety violations detected at site. Check email for details.")
+        except Exception:
+            pass
 
 
 def _load_env_file():
@@ -341,6 +364,14 @@ def predict():
         safe_workers=safe_workers,
         violations=violations,
         detection_time=f"{detection_time} sec",
+    )
+
+
+@app.route("/cctv/grid")
+def cctv_grid():
+    return render_template(
+        "cctv_grid.html",
+        user_name=session.get("user_name", "Captain"),
     )
 
 
@@ -901,6 +932,483 @@ def admin():
 def admin_logout():
     session.pop("admin", None)
     return redirect(url_for("admin"))
+
+
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def send_safety_email(to_email, subject, body):
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = "nithyasheejain@gmail.com"
+    smtp_pass = "xaxo ghmh amnz wxtu"
+
+    if not smtp_user or not smtp_pass:
+        return False, "SMTP credentials (SMTP_USER & SMTP_PASS) not set in environment (.env). To use real Gmail, add your Gmail address and App Password to .env."
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = smtp_user
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "html"))
+
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, to_email, msg.as_string())
+        server.quit()
+        return True, "Email sent successfully via Gmail SMTP!"
+    except Exception as e:
+        return False, f"SMTP Error: {str(e)}"
+
+
+def send_safety_sms(to_phone, message_text):
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID", "")
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "")
+    twilio_number = os.getenv("TWILIO_PHONE", "")
+
+    if not account_sid or not auth_token or not twilio_number:
+        return False, "Twilio credentials (TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE) not set in environment (.env)."
+
+    try:
+        url = f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+        resp = requests.post(
+            url,
+            data={"To": to_phone, "From": twilio_number, "Body": message_text},
+            auth=(account_sid, auth_token),
+            timeout=10
+        )
+        if resp.status_code in (200, 201):
+            return True, "SMS sent successfully via Twilio!"
+        else:
+            return False, f"Twilio API Error: {resp.text}"
+    except Exception as e:
+        return False, f"SMS Error: {str(e)}"
+
+
+from email.mime.base import MIMEBase
+from email import encoders
+
+def send_safety_email_with_attachment(to_email, subject, body, pdf_path):
+    smtp_server = os.getenv("SMTP_SERVER", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = "nithyasheejain@gmail.com"
+    smtp_pass = "xaxo ghmh amnz wxtu"
+
+    try:
+        msg = MIMEMultipart()
+        msg["From"] = smtp_user
+        msg["To"] = to_email
+        msg["Subject"] = subject
+        msg.attach(MIMEText(body, "html"))
+
+        if pdf_path and os.path.exists(pdf_path):
+            with open(pdf_path, "rb") as attachment:
+                part = MIMEBase("application", "octet-stream")
+                part.set_payload(attachment.read())
+            encoders.encode_base64(part)
+            part.add_header("Content-Disposition", f"attachment; filename= {os.path.basename(pdf_path)}")
+            msg.attach(part)
+
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, to_email, msg.as_string())
+        server.quit()
+        return True, "Scheduled report sent successfully with PDF attachment!"
+    except Exception as e:
+        return False, f"SMTP Error: {str(e)}"
+
+
+@app.route("/api/run-scheduled-report", methods=["POST"])
+def api_run_scheduled_report():
+    data = request.get_json() or {}
+    recipient = (data.get("recipient") or session.get("report_recipients") or "nithyasheejain@gmail.com").strip()
+
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, Image
+    from reportlab.lib import colors
+    from reportlab.lib.units import inch
+    from reportlab.lib.styles import getSampleStyleSheet
+
+    filename = "Inspection_Report.pdf"
+    doc = SimpleDocTemplate(filename)
+    styles = getSampleStyleSheet()
+    story = []
+    
+    logo_path = "static/logo.jpeg"
+    if os.path.exists(logo_path):
+        story.append(Image(logo_path, width=1.2*inch, height=1.2*inch))
+        story.append(Spacer(1, 10))
+
+    story.append(Paragraph("<b>SafeSite AI Scheduled Safety Digest</b>", styles["Title"]))
+    story.append(Spacer(1, 10))
+
+    try:
+        with open("history.json", "r", encoding="utf-8") as f:
+            hist = json.load(f)
+    except Exception:
+        hist = []
+
+    total_insp = len(hist)
+    total_viol = sum(x.get("violations", 0) for x in hist)
+
+    table_data = [
+        ["Total Inspections", total_insp],
+        ["Total Violations Flagged", total_viol],
+        ["Report Status", "Automated Scheduled Digest"]
+    ]
+    t = Table(table_data, colWidths=[220, 180])
+    t.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightblue),
+        ('GRID', (0,0), (-1,-1), 1, colors.black),
+        ('FONTNAME', (0,0), (-1,-1), 'Helvetica-Bold'),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 8),
+    ]))
+    story.append(t)
+    doc.build(story)
+
+    subject = "📊 SafeSite AI Scheduled Safety Inspection Report"
+    body = f"<h3>Scheduled Safety Digest</h3><p>Attached is your automated safety inspection report generated by SafeSite AI. Total inspections: <b>{total_insp}</b>, Total violations: <b>{total_viol}</b>.</p>"
+
+    success, msg = send_safety_email_with_attachment(recipient, subject, body, filename)
+    return jsonify({"success": success, "message": msg})
+
+
+@app.route("/api/send-actual-alert", methods=["POST"])
+def api_send_actual_alert():
+    data = request.get_json() or {}
+    phone = (data.get("phone") or session.get("alert_phone", "+15550192834")).strip()
+    email = (data.get("email") or session.get("alert_email", "nithyasheejain@gmail.com")).strip()
+
+    subject = "🚨 SafeSite AI CRITICAL HAZARD ALERT: PPE Violation Detected at North Gate"
+    body = """
+    <div style="font-family: Arial, sans-serif; padding: 20px; background: #f8fafc; border-radius: 10px;">
+        <h2 style="color: #dc2626;">🚨 Critical Safety Hazard Detected</h2>
+        <p>SafeSite AI automated video analytics has flagged a severe PPE non-compliance incident on site.</p>
+        <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 15px 0;" />
+        <p><b>Camera Feed:</b> CAM-01 (Main Entrance Gate)</p>
+        <p><b>Site Zone:</b> North Perimeter</p>
+        <p><b>Violation Type:</b> Missing Hard Hat / Safety Vest</p>
+        <p><b>Timestamp:</b> Live Site Inspection</p>
+        <p><b>Action Required:</b> Dispatch safety supervisor to zone immediately.</p>
+        <br />
+        <a href="http://127.0.0.1:5000/dashboard" style="background: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: bold;">Open SafeSite AI Dashboard</a>
+    </div>
+    """
+
+    success, email_msg = send_safety_email(email, subject, body)
+    sms_success, sms_msg = send_safety_sms(phone, "SafeSite AI CRITICAL ALERT: PPE violation detected at North Gate. Check email immediately.")
+
+    return jsonify({
+        "success": success,
+        "message": f"Actual hazard alert dispatched to {email}! ({email_msg}) | SMS: {sms_msg}"
+    })
+
+
+@app.route("/api/test-alert", methods=["POST"])
+def api_test_alert():
+    data = request.get_json() or {}
+    phone = (data.get("phone") or session.get("alert_phone", "")).strip()
+    email = (data.get("email") or session.get("alert_email", "")).strip()
+    test_type = data.get("type", "both")
+
+    results = []
+    
+    if test_type in ("email", "both") and email:
+        success, msg = send_safety_email(
+            email,
+            "SafeSite AI - Test Safety Alert",
+            "<h3>SafeSite AI Emergency Dispatch</h3><p>This is a verified test alert confirming your Gmail SMTP configuration is operational.</p>"
+        )
+        results.append(f"Email ({email}): {msg}")
+
+    if test_type in ("sms", "both") and phone:
+        success, msg = send_safety_sms(
+            phone,
+            "SafeSite AI: Test safety alert. Your SMS dispatch channel is active."
+        )
+        results.append(f"SMS ({phone}): {msg}")
+
+    return jsonify({"success": True, "results": results})
+
+
+@app.route("/heatmap")
+def heatmap():
+    return render_template(
+        "heatmap.html",
+        user_name=session.get("user_name", "Captain"),
+    )
+
+
+@app.route("/reports/schedule", methods=["GET", "POST"])
+def reports_schedule_page():
+    saved = False
+    frequency = session.get("report_frequency", "daily")
+    recipients = session.get("report_recipients", "nithyasheejain@gmail.com")
+    active = session.get("report_active", True)
+
+    if request.method == "POST":
+        frequency = request.form.get("frequency", "daily")
+        recipients = request.form.get("recipients", "").strip() or recipients
+        active = "active" in request.form
+        session["report_frequency"] = frequency
+        session["report_recipients"] = recipients
+        session["report_active"] = active
+        saved = True
+
+    return render_template(
+        "reports_schedule.html",
+        user_name=session.get("user_name", "Captain"),
+        frequency=frequency,
+        recipients=recipients,
+        active=active,
+        saved=saved,
+    )
+
+
+@app.route("/alerts", methods=["GET", "POST"])
+def alerts_page():
+    saved = False
+    phone = session.get("alert_phone", "+1 (555) 019-2834")
+    email = session.get("alert_email", "nithyasheejain@gmail.com")
+    sms_enabled = session.get("sms_enabled", True)
+    email_enabled = session.get("email_enabled", True)
+
+    if request.method == "POST":
+        phone = request.form.get("phone", "").strip() or phone
+        email = request.form.get("email", "").strip() or email
+        sms_enabled = "sms_enabled" in request.form
+        email_enabled = "email_enabled" in request.form
+        session["alert_phone"] = phone
+        session["alert_email"] = email
+        session["sms_enabled"] = sms_enabled
+        session["email_enabled"] = email_enabled
+        saved = True
+
+    return render_template(
+        "alerts.html",
+        user_name=session.get("user_name", "Captain"),
+        phone=phone,
+        email=email,
+        sms_enabled=sms_enabled,
+        email_enabled=email_enabled,
+        saved=saved,
+    )
+
+
+@app.route("/assistant")
+def assistant_page():
+    return render_template(
+        "assistant.html",
+        user_name=session.get("user_name", "Captain"),
+    )
+
+
+def _normalize_assistant_text(text):
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+
+def _assistant_has_phrase(message, phrase):
+    normalized_message = f" {_normalize_assistant_text(message)} "
+    normalized_phrase = _normalize_assistant_text(phrase)
+    if not normalized_phrase:
+        return False
+    return f" {normalized_phrase} " in normalized_message
+
+
+def _assistant_matches_any(message, phrases):
+    return any(_assistant_has_phrase(message, phrase) for phrase in phrases)
+
+
+def _assistant_history_stats():
+    records = _load_history()
+    total_inspections = len(records)
+    total_workers = sum(int(item.get("workers", 0)) for item in records)
+    total_safe = sum(int(item.get("safe_workers", 0)) for item in records)
+    total_violations = sum(int(item.get("violations", 0)) for item in records)
+    safe_count = sum(1 for item in records if item.get("status") == "SAFE")
+    unsafe_count = total_inspections - safe_count
+    compliance_values = [float(item.get("compliance", 0)) for item in records if item.get("workers")]
+    avg_compliance = round(sum(compliance_values) / len(compliance_values), 1) if compliance_values else 0
+    latest = records[-1] if records else None
+    return {
+        "records": records,
+        "total_inspections": total_inspections,
+        "total_workers": total_workers,
+        "total_safe": total_safe,
+        "total_violations": total_violations,
+        "safe_count": safe_count,
+        "unsafe_count": unsafe_count,
+        "avg_compliance": avg_compliance,
+        "latest": latest,
+    }
+
+
+def _assistant_capabilities_text():
+    return (
+        "I can help with <b>PPE rules</b>, <b>fall protection</b>, <b>scaffolding</b>, "
+        "<b>electrical safety</b>, <b>trench safety</b>, <b>fire and emergency response</b>, "
+        "<b>CCTV or webcam monitoring</b>, and <b>SafeSite analytics/history summaries</b>."
+    )
+
+
+def _build_assistant_reply(raw_message):
+    message = (raw_message or "").strip()
+    normalized = _normalize_assistant_text(message)
+    stats = _assistant_history_stats()
+
+    if not normalized:
+        return (
+            "Ask me anything about construction safety, PPE compliance, live monitoring, or your SafeSite inspection history. "
+            "For example: <i>What does OSHA say about helmets?</i> or <i>Summarize my site analytics</i>."
+        )
+
+    sections = []
+    added = set()
+
+    def add_section(key, title, body):
+        if key in added:
+            return
+        added.add(key)
+        sections.append(f"<b>{title}</b><br>{body}")
+
+    if _assistant_matches_any(normalized, ["hello", "hi", "hey", "good morning", "good evening"]):
+        add_section(
+            "greeting",
+            "Hello",
+            f"Hi {session.get('user_name', 'there')}! {_assistant_capabilities_text()}",
+        )
+
+    if _assistant_matches_any(normalized, ["help", "what can you do", "how can you help", "capabilities", "features"]):
+        add_section(
+            "help",
+            "How I Can Help",
+            _assistant_capabilities_text() + " You can also ask for a summary of recent inspections, violations, compliance, or the latest uploaded review.",
+        )
+
+    if _assistant_matches_any(normalized, ["helmet", "hard hat", "head protection", "ppe", "protective helmet"]):
+        add_section(
+            "helmet",
+            "Helmet And PPE Guidance",
+            "Workers should wear hard hats in areas with risk from falling objects, flying debris, or electrical exposure. Use the correct helmet class, inspect it regularly, and replace damaged shells or suspension systems immediately.",
+        )
+
+    if _assistant_matches_any(normalized, ["vest", "high vis", "high visibility", "reflective jacket", "reflective vest"]):
+        add_section(
+            "vest",
+            "High-Visibility Clothing",
+            "High-visibility garments should be used where workers operate near vehicles, heavy equipment, or low-visibility zones. Choose bright reflective clothing that stays visible during both day and night operations.",
+        )
+
+    if _assistant_matches_any(normalized, ["gloves", "hand protection", "goggles", "eye protection", "glasses", "face shield", "boots", "safety shoes", "footwear"]):
+        add_section(
+            "body-ppe",
+            "Additional PPE",
+            "Use gloves suited to the task, eye or face protection for grinding, cutting, or chemical exposure, and safety footwear with slip-resistant and impact-resistant features in active construction areas.",
+        )
+
+    if _assistant_matches_any(normalized, ["fall", "harness", "height", "roof", "edge", "lifeline", "guardrail"]):
+        add_section(
+            "fall",
+            "Fall Protection",
+            "When people work at height, provide guardrails, safety nets, or personal fall arrest systems. Anchor points, harness fit, and rescue planning are just as important as wearing the equipment.",
+        )
+
+    if _assistant_matches_any(normalized, ["scaffold", "scaffolding", "platform"]):
+        add_section(
+            "scaffold",
+            "Scaffolding Safety",
+            "Scaffolds should be inspected by a competent person, fully planked, properly braced, and used within load limits. Access, guardrails, and stable footing should be checked before every shift.",
+        )
+
+    if _assistant_matches_any(normalized, ["electrical", "shock", "lockout", "tagout", "power line", "wiring", "cable"]):
+        add_section(
+            "electrical",
+            "Electrical Safety",
+            "Keep temporary wiring protected, maintain safe clearance from power lines, and isolate hazardous energy before maintenance. Damaged cords, wet conditions, and exposed conductors should be treated as immediate risks.",
+        )
+
+    if _assistant_matches_any(normalized, ["trench", "excavation", "collapse", "shoring", "soil"]):
+        add_section(
+            "trench",
+            "Excavation And Trench Safety",
+            "Excavations can collapse without warning, so trench boxes, shielding, sloping, or shoring should be used where required. Safe access, atmospheric checks, and spoil pile control are also important.",
+        )
+
+    if _assistant_matches_any(normalized, ["fire", "emergency", "evacuation", "first aid", "incident", "response"]):
+        add_section(
+            "emergency",
+            "Emergency Preparedness",
+            "Sites should maintain marked exits, trained first-aid responders, working extinguishers, and clear escalation steps for incidents. Emergency contacts and reporting procedures should be visible to all crews.",
+        )
+
+    if _assistant_matches_any(normalized, ["housekeeping", "slip", "trip", "clean", "debris", "walkway"]):
+        add_section(
+            "housekeeping",
+            "Housekeeping",
+            "Good housekeeping reduces slips, trips, and blocked access. Keep walkways clear, store tools safely, clean spills quickly, and remove scrap material from active work zones.",
+        )
+
+    if _assistant_matches_any(normalized, ["crane", "lifting", "hoist", "rigging", "load"]):
+        add_section(
+            "lifting",
+            "Lifting Operations",
+            "Lifting plans should confirm load weight, rigging condition, lift path, exclusion zones, and clear signaling. Suspended loads must never travel over workers or uncontrolled access areas.",
+        )
+
+    if _assistant_matches_any(normalized, ["webcam", "camera", "cctv", "live monitoring", "stream", "video feed"]):
+        add_section(
+            "monitoring",
+            "Live Monitoring",
+            "SafeSite AI can review uploaded media, webcam feeds, and CCTV-style streams. Use the live monitoring workspace for real-time checks and the history or analytics pages for after-action review.",
+        )
+
+    if _assistant_matches_any(normalized, ["dashboard", "history", "analytics", "report", "summary", "site status", "inspection", "violations", "compliance", "metrics"]):
+        latest = stats["latest"]
+        latest_text = ""
+        if latest:
+            latest_text = (
+                f" The latest inspection was <b>{html_escape(str(latest.get('file', 'unknown file')))}</b> "
+                f"with <b>{int(latest.get('violations', 0))}</b> violations and <b>{float(latest.get('compliance', 0))}%</b> compliance."
+            )
+        add_section(
+            "metrics",
+            "Site Metrics",
+            f"SafeSite AI has logged <b>{stats['total_inspections']}</b> inspections, reviewed <b>{stats['total_workers']}</b> workers, flagged <b>{stats['total_violations']}</b> violations, and is averaging <b>{stats['avg_compliance']}%</b> compliance. "
+            f"<b>{stats['safe_count']}</b> inspections were safe and <b>{stats['unsafe_count']}</b> were unsafe.{latest_text}",
+        )
+
+    if _assistant_matches_any(normalized, ["latest", "recent", "last inspection", "most recent"]):
+        latest = stats["latest"]
+        if latest:
+            add_section(
+                "latest",
+                "Latest Inspection",
+                f"Your latest logged inspection is <b>{html_escape(str(latest.get('file', 'unknown file')))}</b> on <b>{html_escape(str(latest.get('date', 'unknown date')))}</b> with status <b>{html_escape(str(latest.get('status', 'UNKNOWN')))}</b>, <b>{int(latest.get('violations', 0))}</b> violations, and <b>{float(latest.get('compliance', 0))}%</b> compliance.",
+            )
+        else:
+            add_section(
+                "latest",
+                "Latest Inspection",
+                "No inspection history is available yet. Upload an image or video first, then I can summarize the latest result.",
+            )
+
+    if sections:
+        return "<br><br>".join(sections)
+
+    safe_message = html_escape(message[:180])
+    return (
+        f"Regarding <i>\"{safe_message}\"</i>: As your SafeSite AI safety inspector, I recommend strictly adhering to OSHA guidelines, ensuring all personnel are equipped with proper PPE (helmets, high-vis vests, eye and foot protection), and continuously inspecting active zones via our <b>Detection</b> and <b>CCTV Monitoring</b> modules. If you need specific OSHA standard citations or incident summaries, feel free to ask!"
+    )
+
+
+@app.route("/api/chat", methods=["POST"])
+def api_chat():
+    data = request.get_json(silent=True) or {}
+    message = data.get("message") or ""
+    return jsonify({"reply": _build_assistant_reply(message)})
 
 
 @app.route("/profile", methods=["GET", "POST"])

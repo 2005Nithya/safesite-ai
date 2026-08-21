@@ -136,6 +136,42 @@ class AppRoutesTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.mimetype, 'multipart/x-mixed-replace')
 
+    def test_chat_api_returns_site_metrics_summary(self):
+        with patch('app._assistant_history_stats', return_value={
+            'records': [],
+            'total_inspections': 5,
+            'total_workers': 18,
+            'total_safe': 14,
+            'total_violations': 4,
+            'safe_count': 3,
+            'unsafe_count': 2,
+            'avg_compliance': 88.5,
+            'latest': {'file': 'zone-a.mp4', 'violations': 1, 'compliance': 92.0, 'date': '01-01-2026 10:00 AM', 'status': 'SAFE'},
+        }):
+            response = self.client.post('/api/chat', json={'message': 'Summarize my dashboard analytics'})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIn('5', payload['reply'])
+        self.assertIn('88.5%', payload['reply'])
+        self.assertIn('zone-a.mp4', payload['reply'])
+
+    def test_chat_api_handles_multi_topic_question(self):
+        response = self.client.post('/api/chat', json={'message': 'Tell me about helmet and fall protection rules'})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIn('Helmet And PPE Guidance', payload['reply'])
+        self.assertIn('Fall Protection', payload['reply'])
+
+    def test_chat_api_help_response_lists_capabilities(self):
+        response = self.client.post('/api/chat', json={'message': 'What can you do?'})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertIn('How I Can Help', payload['reply'])
+        self.assertIn('CCTV or webcam monitoring', payload['reply'])
+
 
 if __name__ == '__main__':
     unittest.main()

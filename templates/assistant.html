@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | AI Safety Assistant</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .chat-container {
+      display: flex;
+      flex-direction: column;
+      height: 520px;
+      background: var(--panel-2);
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      overflow: hidden;
+      margin-top: 16px;
+    }
+    .chat-messages {
+      flex: 1;
+      padding: 16px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .message {
+      max-width: 80%;
+      padding: 12px 16px;
+      border-radius: 12px;
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    .message.assistant {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      align-self: flex-start;
+      border-bottom-left-radius: 2px;
+    }
+    .message.user {
+      background: var(--accent);
+      color: #fff;
+      align-self: flex-end;
+      border-bottom-right-radius: 2px;
+    }
+    .chat-input-bar {
+      padding: 12px;
+      background: var(--panel);
+      border-top: 1px solid var(--border);
+      display: flex;
+      gap: 10px;
+    }
+    .chat-input-bar input {
+      flex: 1;
+      margin: 0;
+    }
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+    .suggestion-chip {
+      border: 1px solid var(--border);
+      background: var(--panel);
+      color: var(--text);
+      border-radius: 999px;
+      padding: 9px 12px;
+      cursor: pointer;
+      font-size: 0.88rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    {% set active_page = 'assistant' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell narrow">
+        <div class="topbar">
+          <div>
+            <h1>AI Safety Inspector Assistant</h1>
+            <p class="subtitle">Ask questions about OSHA standards, PPE compliance, and site hazard protocols.</p>
+          </div>
+        </div>
+
+        <div class="card">
+          <h3>SafeSite AI Assistant</h3>
+          <p style="color:var(--muted);">Powered by safety heuristics and site inspection logs. Ask about PPE, fall hazards, electrical safety, live monitoring, or inspection analytics.</p>
+
+          <div class="suggestions">
+            <button class="suggestion-chip" type="button" data-question="Summarize my site analytics">Summarize site analytics</button>
+            <button class="suggestion-chip" type="button" data-question="What are the hard hat rules on site?">Hard hat rules</button>
+            <button class="suggestion-chip" type="button" data-question="Explain fall protection and harness safety">Fall protection</button>
+            <button class="suggestion-chip" type="button" data-question="What can SafeSite AI help me with?">What can you do?</button>
+          </div>
+
+          <div class="chat-container">
+            <div class="chat-messages" id="chatMessages">
+              <div class="message assistant">
+                Hello <strong>{{ user_name }}</strong>! I am your SafeSite AI safety assistant. How can I help you inspect or secure your site today?
+              </div>
+            </div>
+            <div class="chat-input-bar">
+              <input type="text" id="chatInput" class="input" placeholder="Ask about OSHA hard hat rules, scaffolding safety, etc..." />
+              <button type="button" class="btn" id="sendBtn">Send</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · Intelligent Safety Advisory</div>
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const sendBtn = document.getElementById('sendBtn');
+
+    const responses = [
+      "According to OSHA 1926.100, workers must wear protective helmets (hard hats) when working in areas where there is a potential for head injury from falling objects.",
+      "High-visibility safety vests (ANSI/ISEA Class 2 or 3) are mandatory for all workers operating near moving construction vehicles or public roadways.",
+      "Scaffolding must be erected, moved, dismantled, or altered only under the supervision and direction of a competent person.",
+      "Fall protection (harnesses, safety nets, or guardrails) is required for workers on walking/working surfaces with an unprotected side or edge 6 feet or more above a lower level.",
+      "Routine CCTV monitoring helps catch PPE non-compliance instantly and lowers liability risks across all active site zones."
+    ];
+
+    function appendMessage(text, sender) {
+      const div = document.createElement('div');
+      div.className = 'message ' + sender;
+      div.innerHTML = text;
+      chatMessages.appendChild(div);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    async function handleSend() {
+      const text = (chatInput.value || '').trim();
+      if (!text) return;
+      appendMessage(text, 'user');
+      chatInput.value = '';
+
+      // Show typing indicator
+      const typingId = 'typing-' + Date.now();
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'message assistant';
+      typingDiv.id = typingId;
+      typingDiv.innerHTML = 'Thinking...';
+      chatMessages.appendChild(typingDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+
+      try {
+        const res = await fetch("{{ url_for('api_chat') }}", {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+        if (!res.ok) {
+          throw new Error('Request failed');
+        }
+        const data = await res.json();
+        document.getElementById(typingId).remove();
+        appendMessage(data.reply || 'No response received.', 'assistant');
+      } catch (e) {
+        document.getElementById(typingId).remove();
+        appendMessage('Error communicating with SafeSite AI assistant.', 'assistant');
+      }
+    }
+
+    sendBtn.addEventListener('click', handleSend);
+    chatInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') handleSend();
+    });
+    document.querySelectorAll('.suggestion-chip').forEach((button) => {
+      button.addEventListener('click', () => {
+        chatInput.value = button.dataset.question || '';
+        handleSend();
+      });
+    });
+  </script>
+</body>
+</html>

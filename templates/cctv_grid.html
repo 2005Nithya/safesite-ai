@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Multi-Camera Live Grid</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <style>
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(480px, 1fr));
+      gap: 20px;
+      margin-top: 20px;
+    }
+    .cam-box {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .cam-header {
+      padding: 14px 18px;
+      background: var(--panel-2);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+    .cam-viewer {
+      background: #020617;
+      aspect-ratio: 16 / 9;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .cam-viewer video, .cam-viewer img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .cam-overlay {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #fff;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      background: #22c55e;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+    .cam-footer {
+      padding: 14px 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .config-modal {
+      display: none;
+      background: var(--panel-2);
+      padding: 16px;
+      border-top: 1px solid var(--border);
+    }
+    .config-modal.open {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    {% set active_page = 'cctv_grid' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell">
+        <div class="topbar">
+          <div>
+            <h1>Multi-Camera Live Grid & DroidCam Monitor</h1>
+            <p class="subtitle">Configure each camera slot with a sample clip, live CCTV stream URL, or DroidCam / webcam device.</p>
+          </div>
+          <div class="actions">
+            <a class="btn secondary" href="{{ url_for('cctv') }}">Single CCTV View</a>
+          </div>
+        </div>
+
+        <div class="card">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+            <div>
+              <h3>Active Multi-Cam Grid (4 Feeds)</h3>
+              <p style="color:var(--muted); margin-top:4px;">Click <strong>Configure</strong> on any slot to switch between Sample Clips, Live IP CCTV URLs, or PC/DroidCam devices.</p>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <span class="chip good">● AI Detection Grid Online</span>
+            </div>
+          </div>
+
+          <div class="grid-4" id="cameraGridContainer">
+            <!-- Camera 1 -->
+            <div class="cam-box" data-cam="1">
+              <div class="cam-header">
+                <div>
+                  <strong class="c-title">CAM-01: Main Entrance Gate</strong>
+                  <div style="font-size:0.8rem; color:var(--muted);" class="c-zone">Zone: North Perimeter</div>
+                </div>
+                <button type="button" class="btn secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="toggleConfig(1)">⚙️ Configure</button>
+              </div>
+              <div class="cam-viewer" id="viewer1">
+                <div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">CAM-01</span></div>
+                <video class="c-media" src="{{ url_for('static', filename='uploads/site.mp4') }}" autoplay loop muted playsinline></video>
+              </div>
+              <div class="config-modal" id="configModal1">
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Camera Name</label>
+                <input type="text" class="input c-input-name" value="CAM-01: Main Entrance Gate" style="margin-bottom:8px; font-size:0.9rem;" />
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Zone Name</label>
+                <input type="text" class="input c-input-zone" value="Zone: North Perimeter" style="margin-bottom:8px; font-size:0.9rem;" />
+                
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Source Type</label>
+                <select class="input c-input-type" onchange="onTypeChange(1)" style="margin-bottom:8px; font-size:0.9rem;">
+                  <option value="clip">Sample Video Clip</option>
+                  <option value="live">Live CCTV / IP Camera URL (MJPEG)</option>
+                  <option value="device">PC Webcam / DroidCam Device</option>
+                </select>
+
+                <div class="source-clip-group" id="clipGroup1">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Select Clip</label>
+                  <select class="input c-input-clip" style="margin-bottom:8px; font-size:0.9rem;">
+                    <option value="{{ url_for('static', filename='uploads/site.mp4') }}">site.mp4 (Main Site)</option>
+                    <option value="{{ url_for('static', filename='uploads/v1.mp4') }}">v1.mp4 (Crane Zone)</option>
+                    <option value="{{ url_for('static', filename='uploads/v2.mp4') }}">v2.mp4 (Material Staging)</option>
+                    <option value="{{ url_for('static', filename='uploads/v3.mp4') }}">v3.mp4 (Foundation)</option>
+                  </select>
+                </div>
+
+                <div class="source-live-group" id="liveGroup1" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">CCTV Stream URL (e.g. http://&lt;phone-ip&gt;:8080/video)</label>
+                  <input type="text" class="input c-input-url" placeholder="http://192.168.1.50:8080/video" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <div class="source-device-group" id="deviceGroup1" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Device Index (0 = Laptop Cam, 1 = DroidCam)</label>
+                  <input type="number" class="input c-input-index" value="1" min="0" max="9" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <button type="button" class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick="saveConfig(1)">Apply Feed</button>
+              </div>
+              <div class="cam-footer">
+                <span>Feed status: <strong style="color:var(--good);">Active</strong></span>
+                <span>AI Detection: <strong style="color:var(--accent);">YOLOv8</strong></span>
+              </div>
+            </div>
+
+            <!-- Camera 2 -->
+            <div class="cam-box" data-cam="2">
+              <div class="cam-header">
+                <div>
+                  <strong class="c-title">CAM-02: Tower Crane Zone</strong>
+                  <div style="font-size:0.8rem; color:var(--muted);" class="c-zone">Zone: High Elevation</div>
+                </div>
+                <button type="button" class="btn secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="toggleConfig(2)">⚙️ Configure</button>
+              </div>
+              <div class="cam-viewer" id="viewer2">
+                <div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">CAM-02</span></div>
+                <video class="c-media" src="{{ url_for('static', filename='uploads/v1.mp4') }}" autoplay loop muted playsinline></video>
+              </div>
+              <div class="config-modal" id="configModal2">
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Camera Name</label>
+                <input type="text" class="input c-input-name" value="CAM-02: Tower Crane Zone" style="margin-bottom:8px; font-size:0.9rem;" />
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Zone Name</label>
+                <input type="text" class="input c-input-zone" value="Zone: High Elevation" style="margin-bottom:8px; font-size:0.9rem;" />
+                
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Source Type</label>
+                <select class="input c-input-type" onchange="onTypeChange(2)" style="margin-bottom:8px; font-size:0.9rem;">
+                  <option value="clip">Sample Video Clip</option>
+                  <option value="live">Live CCTV / IP Camera URL (MJPEG)</option>
+                  <option value="device">PC Webcam / DroidCam Device</option>
+                </select>
+
+                <div class="source-clip-group" id="clipGroup2">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Select Clip</label>
+                  <select class="input c-input-clip" style="margin-bottom:8px; font-size:0.9rem;">
+                    <option value="{{ url_for('static', filename='uploads/v1.mp4') }}">v1.mp4 (Crane Zone)</option>
+                    <option value="{{ url_for('static', filename='uploads/site.mp4') }}">site.mp4 (Main Site)</option>
+                    <option value="{{ url_for('static', filename='uploads/v2.mp4') }}">v2.mp4 (Material Staging)</option>
+                    <option value="{{ url_for('static', filename='uploads/v3.mp4') }}">v3.mp4 (Foundation)</option>
+                  </select>
+                </div>
+
+                <div class="source-live-group" id="liveGroup2" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">CCTV Stream URL</label>
+                  <input type="text" class="input c-input-url" placeholder="http://192.168.1.51:8080/video" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <div class="source-device-group" id="deviceGroup2" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Device Index</label>
+                  <input type="number" class="input c-input-index" value="0" min="0" max="9" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <button type="button" class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick="saveConfig(2)">Apply Feed</button>
+              </div>
+              <div class="cam-footer">
+                <span>Feed status: <strong style="color:var(--good);">Active</strong></span>
+                <span>AI Detection: <strong style="color:var(--accent);">YOLOv8</strong></span>
+              </div>
+            </div>
+
+            <!-- Camera 3 -->
+            <div class="cam-box" data-cam="3">
+              <div class="cam-header">
+                <div>
+                  <strong class="c-title">CAM-03: Material Staging Area</strong>
+                  <div style="font-size:0.8rem; color:var(--muted);" class="c-zone">Zone: Ground Level East</div>
+                </div>
+                <button type="button" class="btn secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="toggleConfig(3)">⚙️ Configure</button>
+              </div>
+              <div class="cam-viewer" id="viewer3">
+                <div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">CAM-03</span></div>
+                <video class="c-media" src="{{ url_for('static', filename='uploads/v2.mp4') }}" autoplay loop muted playsinline></video>
+              </div>
+              <div class="config-modal" id="configModal3">
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Camera Name</label>
+                <input type="text" class="input c-input-name" value="CAM-03: Material Staging Area" style="margin-bottom:8px; font-size:0.9rem;" />
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Zone Name</label>
+                <input type="text" class="input c-input-zone" value="Zone: Ground Level East" style="margin-bottom:8px; font-size:0.9rem;" />
+                
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Source Type</label>
+                <select class="input c-input-type" onchange="onTypeChange(3)" style="margin-bottom:8px; font-size:0.9rem;">
+                  <option value="clip">Sample Video Clip</option>
+                  <option value="live">Live CCTV / IP Camera URL (MJPEG)</option>
+                  <option value="device">PC Webcam / DroidCam Device</option>
+                </select>
+
+                <div class="source-clip-group" id="clipGroup3">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Select Clip</label>
+                  <select class="input c-input-clip" style="margin-bottom:8px; font-size:0.9rem;">
+                    <option value="{{ url_for('static', filename='uploads/v2.mp4') }}">v2.mp4 (Material Staging)</option>
+                    <option value="{{ url_for('static', filename='uploads/site.mp4') }}">site.mp4 (Main Site)</option>
+                    <option value="{{ url_for('static', filename='uploads/v1.mp4') }}">v1.mp4 (Crane Zone)</option>
+                    <option value="{{ url_for('static', filename='uploads/v3.mp4') }}">v3.mp4 (Foundation)</option>
+                  </select>
+                </div>
+
+                <div class="source-live-group" id="liveGroup3" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">CCTV Stream URL</label>
+                  <input type="text" class="input c-input-url" placeholder="http://192.168.1.52:8080/video" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <div class="source-device-group" id="deviceGroup3" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Device Index</label>
+                  <input type="number" class="input c-input-index" value="1" min="0" max="9" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <button type="button" class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick="saveConfig(3)">Apply Feed</button>
+              </div>
+              <div class="cam-footer">
+                <span>Feed status: <strong style="color:var(--good);">Active</strong></span>
+                <span>AI Detection: <strong style="color:var(--accent);">YOLOv8</strong></span>
+              </div>
+            </div>
+
+            <!-- Camera 4 -->
+            <div class="cam-box" data-cam="4">
+              <div class="cam-header">
+                <div>
+                  <strong class="c-title">CAM-04: Interior Foundation</strong>
+                  <div style="font-size:0.8rem; color:var(--muted);" class="c-zone">Zone: Basement Level</div>
+                </div>
+                <button type="button" class="btn secondary" style="padding:4px 10px; font-size:0.8rem;" onclick="toggleConfig(4)">⚙️ Configure</button>
+              </div>
+              <div class="cam-viewer" id="viewer4">
+                <div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">CAM-04</span></div>
+                <video class="c-media" src="{{ url_for('static', filename='uploads/v3.mp4') }}" autoplay loop muted playsinline></video>
+              </div>
+              <div class="config-modal" id="configModal4">
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Camera Name</label>
+                <input type="text" class="input c-input-name" value="CAM-04: Interior Foundation" style="margin-bottom:8px; font-size:0.9rem;" />
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Zone Name</label>
+                <input type="text" class="input c-input-zone" value="Zone: Basement Level" style="margin-bottom:8px; font-size:0.9rem;" />
+                
+                <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Source Type</label>
+                <select class="input c-input-type" onchange="onTypeChange(4)" style="margin-bottom:8px; font-size:0.9rem;">
+                  <option value="clip">Sample Video Clip</option>
+                  <option value="live">Live CCTV / IP Camera URL (MJPEG)</option>
+                  <option value="device">PC Webcam / DroidCam Device</option>
+                </select>
+
+                <div class="source-clip-group" id="clipGroup4">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Select Clip</label>
+                  <select class="input c-input-clip" style="margin-bottom:8px; font-size:0.9rem;">
+                    <option value="{{ url_for('static', filename='uploads/v3.mp4') }}">v3.mp4 (Foundation)</option>
+                    <option value="{{ url_for('static', filename='uploads/site.mp4') }}">site.mp4 (Main Site)</option>
+                    <option value="{{ url_for('static', filename='uploads/v1.mp4') }}">v1.mp4 (Crane Zone)</option>
+                    <option value="{{ url_for('static', filename='uploads/v2.mp4') }}">v2.mp4 (Material Staging)</option>
+                  </select>
+                </div>
+
+                <div class="source-live-group" id="liveGroup4" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">CCTV Stream URL</label>
+                  <input type="text" class="input c-input-url" placeholder="http://192.168.1.53:8080/video" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <div class="source-device-group" id="deviceGroup4" style="display:none;">
+                  <label style="font-size:0.85rem; font-weight:600; display:block; margin-bottom:4px;">Device Index</label>
+                  <input type="number" class="input c-input-index" value="1" min="0" max="9" style="margin-bottom:8px; font-size:0.9rem;" />
+                </div>
+
+                <button type="button" class="btn" style="padding:6px 14px; font-size:0.85rem;" onclick="saveConfig(4)">Apply Feed</button>
+              </div>
+              <div class="cam-footer">
+                <span>Feed status: <strong style="color:var(--good);">Active</strong></span>
+                <span>AI Detection: <strong style="color:var(--accent);">YOLOv8</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · Multi-Camera Live Surveillance Grid</div>
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script>
+    function toggleConfig(camId) {
+      const modal = document.getElementById('configModal' + camId);
+      modal.classList.toggle('open');
+    }
+
+    function onTypeChange(camId) {
+      const box = document.querySelector(`.cam-box[data-cam="${camId}"]`);
+      const type = box.querySelector('.c-input-type').value;
+      box.querySelector('#clipGroup' + camId).style.display = type === 'clip' ? 'block' : 'none';
+      box.querySelector('#liveGroup' + camId).style.display = type === 'live' ? 'block' : 'none';
+      box.querySelector('#deviceGroup' + camId).style.display = type === 'device' ? 'block' : 'none';
+    }
+
+    function saveConfig(camId) {
+      const box = document.querySelector(`.cam-box[data-cam="${camId}"]`);
+      const name = box.querySelector('.c-input-name').value;
+      const zone = box.querySelector('.c-input-zone').value;
+      const type = box.querySelector('.c-input-type').value;
+      
+      let sourceVal = '';
+      if (type === 'clip') {
+        sourceVal = box.querySelector('.c-input-clip').value;
+      } else if (type === 'live') {
+        sourceVal = box.querySelector('.c-input-url').value;
+      } else {
+        sourceVal = box.querySelector('.c-input-index').value;
+      }
+
+      box.querySelector('.c-title').textContent = name;
+      box.querySelector('.c-zone').textContent = zone;
+      box.querySelector('.c-label').textContent = name.split(':')[0];
+
+      const viewer = document.getElementById('viewer' + camId);
+      if (type === 'clip') {
+        viewer.innerHTML = `<div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">${name.split(':')[0]}</span></div><video class="c-media" src="${sourceVal}" autoplay loop muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>`;
+      } else if (type === 'live') {
+        const streamRoute = "{{ url_for('cctv_stream') }}?source=" + encodeURIComponent(sourceVal);
+        viewer.innerHTML = `<div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">${name.split(':')[0]}</span></div><img class="c-media" src="${streamRoute}" alt="Live CCTV" style="width:100%; height:100%; object-fit:cover;" />`;
+      } else {
+        const deviceRoute = "{{ url_for('cctv_device') }}?index=" + sourceVal;
+        viewer.innerHTML = `<div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">${name.split(':')[0]}</span></div><img class="c-media" src="${deviceRoute}" alt="Device Camera" style="width:100%; height:100%; object-fit:cover;" />`;
+      }
+
+      toggleConfig(camId);
+
+      // Save to localStorage
+      localStorage.setItem(`safesite_cam_${camId}`, JSON.stringify({ name, zone, type, sourceVal }));
+    }
+
+    // Load saved config on startup
+    window.addEventListener('DOMContentLoaded', () => {
+      for (let i = 1; i <= 4; i++) {
+        const saved = localStorage.getItem(`safesite_cam_${i}`);
+        if (saved) {
+          try {
+            const data = JSON.parse(saved);
+            const box = document.querySelector(`.cam-box[data-cam="${i}"]`);
+            if (box) {
+              box.querySelector('.c-title').textContent = data.name;
+              box.querySelector('.c-zone').textContent = data.zone;
+              box.querySelector('.c-label').textContent = data.name.split(':')[0];
+              box.querySelector('.c-input-name').value = data.name;
+              box.querySelector('.c-input-zone').value = data.zone;
+              box.querySelector('.c-input-type').value = data.type;
+              
+              onTypeChange(i);
+
+              if (data.type === 'clip') {
+                box.querySelector('.c-input-clip').value = data.sourceVal;
+              } else if (data.type === 'live') {
+                box.querySelector('.c-input-url').value = data.sourceVal;
+              } else {
+                box.querySelector('.c-input-index').value = data.sourceVal;
+              }
+
+              const viewer = document.getElementById('viewer' + i);
+              if (data.type === 'clip') {
+                viewer.innerHTML = `<div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">${data.name.split(':')[0]}</span></div><video class="c-media" src="${data.sourceVal}" autoplay loop muted playsinline style="width:100%; height:100%; object-fit:cover;"></video>`;
+              } else if (data.type === 'live') {
+                const streamRoute = "{{ url_for('cctv_stream') }}?source=" + encodeURIComponent(data.sourceVal);
+                viewer.innerHTML = `<div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">${data.name.split(':')[0]}</span></div><img class="c-media" src="${streamRoute}" alt="Live CCTV" style="width:100%; height:100%; object-fit:cover;" />`;
+              } else {
+                const deviceRoute = "{{ url_for('cctv_device') }}?index=" + data.sourceVal;
+                viewer.innerHTML = `<div class="cam-overlay"><span class="live-dot"></span> <span class="c-label">${data.name.split(':')[0]}</span></div><img class="c-media" src="${deviceRoute}" alt="Device Camera" style="width:100%; height:100%; object-fit:cover;" />`;
+              }
+            }
+          } catch(e) {}
+        }
+      }
+    });
+  </script>
+</body>
+</html>

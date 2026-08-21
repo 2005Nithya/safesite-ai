@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Safety Alerts</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app">
+    {% set active_page = 'alerts' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell narrow">
+        <div class="topbar">
+          <div>
+            <h1>Instant Safety Alerts</h1>
+            <p class="subtitle">Configure SMS and Email notifications for automated PPE hazard dispatching.</p>
+          </div>
+        </div>
+
+        {% if saved %}
+        <div class="card" style="background:rgba(22, 101, 52, 0.15); border-color:#166534;">
+          <p style="color:#166534; font-weight:600; margin:0;">✓ Alert dispatch preferences updated successfully!</p>
+        </div>
+        {% endif %}
+
+        <div class="card">
+          <h3>Alert Dispatch Channels</h3>
+          <p style="color:var(--muted); margin-bottom:20px;">When YOLOv8 detects severe safety violations (e.g. missing hard hat or vest), SafeSite AI immediately broadcasts alerts to the registered supervisor contacts below.</p>
+          
+          <form action="{{ url_for('alerts_page') }}" method="post">
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-weight:600; margin-bottom:6px;">Supervisor Phone (SMS Alerts)</label>
+              <input type="text" name="phone" class="input" value="{{ phone or '+1 (555) 019-2834' }}" placeholder="+1 555-000-0000" style="max-width:100%;" />
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-weight:600; margin-bottom:6px;">Supervisor Email (Incident Reports)</label>
+              <input type="email" name="email" class="input" value="{{ email or 'safety-lead@safesite.ai' }}" placeholder="supervisor@company.com" style="max-width:100%;" />
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                <input type="checkbox" name="sms_enabled" value="1" {% if sms_enabled %}checked{% endif %} style="width:18px;height:18px;" />
+                <strong>Enable instant SMS dispatch on critical violations</strong>
+              </label>
+            </div>
+
+            <div style="margin-bottom:20px;">
+              <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                <input type="checkbox" name="email_enabled" value="1" {% if email_enabled %}checked{% endif %} style="width:18px;height:18px;" />
+                <strong>Enable email digest & emergency PDF reports</strong>
+              </label>
+            </div>
+
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <button type="submit" class="btn">Save Preferences</button>
+              <button type="button" class="btn secondary" id="testAlertBtn">Send Test Alert</button>
+              <button type="button" class="btn secondary" id="actualAlertBtn" style="background:#dc2626; color:white; border-color:#dc2626;">🚀 Send Actual Hazard Alert Now</button>
+            </div>
+            <div id="testResultBox" style="margin-top:14px; display:none; padding:12px; border-radius:8px; font-size:0.9rem; background:var(--panel-2); border:1px solid var(--border);"></div>
+          </form>
+        </div>
+
+        <script>
+          document.getElementById('testAlertBtn').addEventListener('click', async () => {
+            const phone = document.querySelector('input[name="phone"]').value;
+            const email = document.querySelector('input[name="email"]').value;
+            const box = document.getElementById('testResultBox');
+            box.style.display = 'block';
+            box.innerHTML = 'Sending test alert via backend...';
+
+            try {
+              const res = await fetch("{{ url_for('api_test_alert') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, email, type: 'both' })
+              });
+              const data = await res.json();
+              if (data.results) {
+                box.innerHTML = '<strong>Dispatch Results:</strong><br/>' + data.results.join('<br/>');
+              } else {
+                box.innerHTML = 'Test dispatch completed.';
+              }
+            } catch (e) {
+              box.innerHTML = 'Error executing test dispatch.';
+            }
+          });
+
+          document.getElementById('actualAlertBtn').addEventListener('click', async () => {
+            const phone = document.querySelector('input[name="phone"]').value;
+            const email = document.querySelector('input[name="email"]').value;
+            const box = document.getElementById('testResultBox');
+            box.style.display = 'block';
+            box.innerHTML = 'Dispatching actual critical hazard alert to <strong>' + email + '</strong>...';
+
+            try {
+              const res = await fetch("{{ url_for('api_send_actual_alert') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone, email })
+              });
+              const data = await res.json();
+              box.innerHTML = data.message || 'Actual hazard alert dispatched successfully!';
+            } catch (e) {
+              box.innerHTML = 'Error dispatching actual hazard alert.';
+            }
+          });
+        </script>
+
+        <div class="card">
+          <h3>Recent Dispatched Alerts Log</h3>
+          <p style="color:var(--muted); margin-bottom:16px;">Audit trail of automated notifications sent by the detection engine.</p>
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse; text-align:left; font-size:0.92rem;">
+              <thead>
+                <tr style="border-bottom:1px solid var(--border); color:var(--muted);">
+                  <th style="padding:10px;">Timestamp</th>
+                  <th style="padding:10px;">Zone</th>
+                  <th style="padding:10px;">Violation Type</th>
+                  <th style="padding:10px;">Channel</th>
+                  <th style="padding:10px;">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px;">Today, 11:42 AM</td>
+                  <td style="padding:10px;">North Gate</td>
+                  <td style="padding:10px;">Missing Hard Hat</td>
+                  <td style="padding:10px;">SMS + Email</td>
+                  <td style="padding:10px;"><span class="chip good">Delivered</span></td>
+                </tr>
+                <tr style="border-bottom:1px solid var(--border);">
+                  <td style="padding:10px;">Yesterday, 03:15 PM</td>
+                  <td style="padding:10px;">Crane Zone</td>
+                  <td style="padding:10px;">Missing Safety Vest</td>
+                  <td style="padding:10px;">SMS</td>
+                  <td style="padding:10px;"><span class="chip good">Delivered</span></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · Instant Safety Dispatch System</div>
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

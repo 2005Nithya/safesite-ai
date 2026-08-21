@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SafeSite AI | Scheduled Reports</title>
+  <link rel="manifest" href="{{ url_for('manifest') }}" />
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='icon-180.png') }}" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body>
+  <div class="app">
+    {% set active_page = 'reports_schedule' %}
+    {% include 'sidebar.html' %}
+    <main class="main">
+      <div class="app-shell narrow">
+        <div class="topbar">
+          <div>
+            <h1>Scheduled Safety Reports</h1>
+            <p class="subtitle">Automate daily and weekly PDF safety digest emails to project stakeholders.</p>
+          </div>
+        </div>
+
+        {% if saved %}
+        <div class="card" style="background:rgba(22, 101, 52, 0.15); border-color:#166534;">
+          <p style="color:#166534; font-weight:600; margin:0;">✓ Report schedule updated successfully!</p>
+        </div>
+        {% endif %}
+
+        <div class="card">
+          <h3>Automated Report Dispatcher</h3>
+          <p style="color:var(--muted); margin-bottom:20px;">Configure recurring generation and email dispatch of official inspection PDFs.</p>
+          
+          <form action="{{ url_for('reports_schedule_page') }}" method="post">
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-weight:600; margin-bottom:6px;">Frequency</label>
+              <select name="frequency" class="input" style="max-width:100%;">
+                <option value="daily" {% if frequency == 'daily' %}selected{% endif %}>Daily Safety Digest (Every evening at 6:00 PM)</option>
+                <option value="weekly" {% if frequency == 'weekly' %}selected{% endif %}>Weekly Summary (Every Friday at 5:00 PM)</option>
+                <option value="monthly" {% if frequency == 'monthly' %}selected{% endif %}>Monthly Executive Audit</option>
+              </select>
+            </div>
+
+            <div style="margin-bottom:16px;">
+              <label style="display:block; font-weight:600; margin-bottom:6px;">Recipient Email List</label>
+              <input type="text" name="recipients" class="input" value="{{ recipients or 'executives@safesite.ai, safety-lead@safesite.ai' }}" placeholder="email1@company.com, email2@company.com" style="max-width:100%;" />
+            </div>
+
+            <div style="margin-bottom:20px;">
+              <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                <input type="checkbox" name="active" value="1" {% if active %}checked{% endif %} style="width:18px;height:18px;" />
+                <strong>Enable automated scheduled dispatches</strong>
+              </label>
+            </div>
+
+            <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
+              <button type="submit" class="btn">Save Schedule</button>
+              <button type="button" class="btn secondary" id="runReportBtn">Run Report Now (Email PDF)</button>
+            </div>
+            <div id="reportResultBox" style="margin-top:14px; display:none; padding:12px; border-radius:8px; font-size:0.9rem; background:var(--panel-2); border:1px solid var(--border);"></div>
+          </form>
+        </div>
+
+        <script>
+          document.getElementById('runReportBtn').addEventListener('click', async () => {
+            const recipient = document.querySelector('input[name="recipients"]').value;
+            const box = document.getElementById('reportResultBox');
+            box.style.display = 'block';
+            box.innerHTML = `Generating PDF inspection report and emailing to <strong>${recipient}</strong>...`;
+
+            try {
+              const res = await fetch("{{ url_for('api_run_scheduled_report') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ recipient })
+              });
+              const data = await res.json();
+              box.innerHTML = data.message || 'Report dispatched successfully!';
+            } catch (e) {
+              box.innerHTML = 'Error dispatching scheduled report.';
+            }
+          });
+        </script>
+
+        <div class="footer">SafeSite AI · <strong>Nithyashree P Jain</strong> · Automated Reporting Engine</div>
+      </div>
+    </main>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
